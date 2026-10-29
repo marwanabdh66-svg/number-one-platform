@@ -1,367 +1,888 @@
 import streamlit as st
 import sqlite3
 import hashlib
-import pandas as pd
-from PIL import Image
-from google import genai
-from google.genai import types
+import secrets
+from datetime import datetime
 
-# -------------------------------------------------------------------
-# 1. إعدادات الصفحة وحقن كود التوجيه والمؤشرات البصرية (CSS)
-# -------------------------------------------------------------------
-st.set_page_config(page_title="Number One AI - Super Platform", page_icon="🚀", layout="wide")
+# =====================================
+# NUMBER ONE - AI AD STUDIO
+# =====================================
+
+st.set_page_config(
+    page_title="NUMBER ONE | استوديو الإعلانات",
+    page_icon="👑",
+    layout="wide"
+)
+
+DB = "number_one.db"
+
+
+# =====================================
+# قاعدة البيانات
+# =====================================
+
+def connect_db():
+    return sqlite3.connect(DB, timeout=20)
+
+
+def setup_db():
+    con = connect_db()
+    cur = con.cursor()
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            plan TEXT DEFAULT 'Free',
+            created TEXT NOT NULL
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            method TEXT NOT NULL,
+            amount TEXT NOT NULL,
+            reference TEXT NOT NULL,
+            status TEXT DEFAULT 'قيد المراجعة',
+            created TEXT NOT NULL
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            category TEXT NOT NULL,
+            details TEXT NOT NULL,
+            contact TEXT NOT NULL,
+            created TEXT NOT NULL
+        )
+    """)
+
+    con.commit()
+    con.close()
+
+
+setup_db()
+
+
+# =====================================
+# كلمات المرور
+# =====================================
+
+def password_hash(password):
+    salt = st.secrets.get(
+        "NUMBER_ONE_PASSWORD_SALT",
+        "change-this-salt-before-production"
+    )
+
+    return hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode(),
+        salt.encode(),
+        200000
+    ).hex()
+
+
+def register_user(username, password):
+    con = connect_db()
+
+    try:
+        con.execute("""
+            INSERT INTO users
+            (username, password, plan, created)
+            VALUES (?, ?, 'Free', ?)
+        """, (
+            username.strip(),
+            password_hash(password),
+            datetime.now().strftime("%Y-%m-%d %H:%M")
+        ))
+
+        con.commit()
+        return True
+
+    except sqlite3.IntegrityError:
+        return False
+
+    finally:
+        con.close()
+
+
+def login_user(username, password):
+    con = connect_db()
+
+    user = con.execute(
+        "SELECT username, password, plan FROM users WHERE username=?",
+        (username.strip(),)
+    ).fetchone()
+
+    con.close()
+
+    if user and secrets.compare_digest(
+        user[1],
+        password_hash(password)
+    ):
+        return {"username": user[0], "plan": user[2]}
+
+    return None
+
+
+# =====================================
+# التصميم والألوان
+# =====================================
 
 st.markdown("""
 <style>
-    /* تأثير وميض حاد وجاذب لتحديد الصندوق أو الزر المستهدف للزبون المحتار */
-    .highlight-target {
-        border: 3px solid #FF4B4B !important;
-        box-shadow: 0 0 25px #FF4B4B !important;
-        animation: blinker 1.5s linear infinite;
-        padding: 20px;
-        border-radius: 10px;
-        background-color: #111;
-    }
-    @keyframes blinker {
-        50% { opacity: 0.6; }
-    }
-    
-    /* تصميم السهم الإرشادي اللامع والمتحرك (الماوس الافتراضي للـ AI) */
-    .ai-pointer-arrow {
-        color: #FF4B4B;
-        font-size: 24px;
-        font-weight: bold;
-        display: inline-block;
-        animation: bounce 0.6s infinite alternate;
-        margin-right: 10px;
-    }
-    @keyframes bounce {
-        from { transform: translateX(0); }
-        to { transform: translateX(-12px); }
-    }
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
+
+html, body, [class*="css"] {
+    font-family: Cairo, sans-serif;
+}
+
+.stApp {
+    background:
+        radial-gradient(circle at top right, #1b3157, transparent 38%),
+        linear-gradient(135deg, #070b16, #111a2e);
+    color: #f5f7ff;
+}
+
+section[data-testid="stSidebar"] {
+    background: #0a1120;
+    border-left: 1px solid #344563;
+}
+
+.hero {
+    background: linear-gradient(135deg, #192a49, #0b1221);
+    border: 1px solid #d7b45d;
+    border-radius: 22px;
+    padding: 28px 16px;
+    text-align: center;
+    margin-bottom: 25px;
+}
+
+.hero h1 {
+    color: #f0cc70;
+    font-size: 40px;
+    font-weight: 800;
+}
+
+.hero p {
+    color: #d7dfef;
+    font-size: 16px;
+}
+
+.card {
+    background: linear-gradient(145deg, #19243a, #0d1526);
+    border: 1px solid #344663;
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 15px;
+}
+
+.gold {
+    color: #f0cc70;
+}
+
+div.stButton > button {
+    background: linear-gradient(135deg, #f0cc70, #b78a35);
+    color: #111827;
+    font-weight: 800;
+    border: none;
+    border-radius: 10px;
+    min-height: 42px;
+    width: 100%;
+}
+
+div.stButton > button:hover {
+    background: #ffe6a0;
+    color: #111827;
+}
+
+.stTextInput input, .stTextArea textarea {
+    background: #111c30;
+    color: white;
+    border: 1px solid #344663;
+}
+
+hr {
+    border-color: #344663;
+}
 </style>
 """, unsafe_allow_html=True)
 
-# -------------------------------------------------------------------
-# 2. إنشاء قاعدة البيانات المركزية الشاملة
-# -------------------------------------------------------------------
-conn = sqlite3.connect('number_one_ultimate_db.db', check_same_thread=False)
-cursor = conn.cursor()
 
-# جدول المستخدمين والطلاب والمسوقين بالعمولة
-cursor.execute('''
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        email TEXT UNIQUE,
-        password_hash TEXT,
-        plan_type TEXT,
-        status TEXT,
-        currency TEXT,
-        amount REAL,
-        affiliate_code TEXT UNIQUE,
-        referred_by TEXT,
-        balance_usd REAL DEFAULT 0.0,
-        progress_percent INTEGER DEFAULT 0
-    )
-''')
+# =====================================
+# رأس الموقع
+# =====================================
 
-# جدول طلبات خدمة العملاء العامة مع أرقام هواتف الزبائن
-cursor.execute('''
-    CREATE TABLE IF NOT EXISTS customer_leads (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        client_phone TEXT,
-        client_message TEXT,
-        ai_reply TEXT,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-''')
+st.markdown("""
+<div class="hero">
+    <h1>👑 NUMBER ONE</h1>
+    <p>استوديو الإعلانات والقوالب الإبداعية</p>
+    <p>اصنع فكرتك الإعلانية بأسلوب احترافي</p>
+</div>
+""", unsafe_allow_html=True)
 
-# جدول الشركات الأخرى التي تؤجر خدمة العملاء وتربط أرقامها الخاصة
-cursor.execute('''
-    CREATE TABLE IF NOT EXISTS business_widgets (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        owner_email TEXT,
-        company_name TEXT,
-        company_phone TEXT,
-        ai_behavior TEXT,
-        widget_token TEXT UNIQUE
-    )
-''')
-conn.commit()
 
-# دالة حماية وتشفير كلمات المرور
-def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
+# =====================================
+# القائمة الرئيسية
+# =====================================
 
-owner_email = "marwanabdh66@gmail.com"
-owner_pass_raw = "uuiopoeyr1"
-owner_hash = hash_password(owner_pass_raw)
+pages = [
+    "🏠 الرئيسية",
+    "🎨 قوالب الإعلانات",
+    "🤖 صانع الإعلان",
+    "🎬 طلب تصميم",
+    "💎 الاشتراكات",
+    "💳 طلب الدفع",
+    "👤 حسابي",
+    "🔐 تسجيل الدخول",
+    "📝 إنشاء حساب",
+    "📞 التواصل",
+    "🛡️ الإدارة"
+]
 
-# -------------------------------------------------------------------
-# 3. تهيئة ربط ذكاء Gemini الاصطناعي (النصوص والصور والتوجيه)
-# -------------------------------------------------------------------
-# ضع مفتاح الـ API الخاص بك هنا لتفعيل الاتصال الحي الفوري
-# client = genai.Client(api_key="YOUR_GEMINI_API_KEY")
+st.sidebar.markdown(
+    "<h2 style='color:#f0cc70;text-align:center'>👑 NUMBER ONE</h2>",
+    unsafe_allow_html=True
+)
 
-def call_gemini_mega(prompt, image=None, system_instruction=""):
-    try:
-        # عند وضع مفتاح الـ API، قم بإلغاء التعليق عن الأسطر أدناه لتشغيل النظام حياً:
-        # config = types.GenerateContentConfig(system_instruction=system_instruction)
-        # if image:
-        #     response = client.models.generate_content(model='gemini-2.5-flash', contents=[image, prompt], config=config)
-        # else:
-        #     response = client.models.generate_content(model='gemini-2.5-flash', contents=prompt, config=config)
-        # return response.text
-        
-        if image:
-            return "[محاكاة Gemini الرؤية]: تم فحص وقراءة الصورة المرفقة بنجاح! الشرح للمنهج الدراسي جاهز بالكامل."
-        return f"[محاكاة Gemini الموجه]: أهلاً بك في منصة Number One. لقد تلقيت طلبك: '{prompt}' وجاري توجيهك بصرياً في الشاشة."
-    except Exception as e:
-        return "عذراً مروان، يرجى تفعيل مفتاح الـ API للربط المباشر مع خوادم جوجل."
+page = st.sidebar.radio("القائمة", pages)
 
-# منطق الموجه البصري وتحريك الأسهم الافتراضية للزبائن المحتارين
-if "ai_screen_action" not in st.session_state:
-    st.session_state["ai_screen_action"] = None
+username = st.session_state.get("username")
 
-def run_ai_copilot_director(user_text):
-    intent = user_text.lower()
-    if "اشترك" in intent or "بكم" in intent or "سعر" in intent or "اشتراك" in intent:
-        st.session_state["ai_screen_action"] = "TARGET_REGISTER"
-        return "🤖 جيميناي يوجهك: لقد قمت بتحريك الماوس وإضاءة قسم '🔐 تسجيل الدخول والاشتراك' باللون الأحمر على اليمين! انقر عليه لتفعيل حسابك فوراً دون حيرة."
-    elif "مالك" in intent or "مروان" in intent or "إدارة" in intent:
-        st.session_state["ai_screen_action"] = "TARGET_OWNER"
-        return "🤖 جيميناي يوجهك: أهلاً بالإدارة! انظر لأسفل القائمة الجانبية، لقد وضعت لك سهم الإشارة 👈 بجانب '🔑 لوحة تحكم المالك مروان' لتدخل مباشرة."
-    elif "تواصل" in intent or "رقم" in intent or "مشكلة" in intent or "مساعدة" in intent:
-        st.session_state["ai_screen_action"] = "TARGET_SUPPORT"
-        return "🤖 جيميناي يوجهك: تم سحب مؤشر الشاشة وإضاءة قسم '📞 خدمة العملاء (اترك رقمك)'. انقر عليه وضع رقم هاتف تواصلك."
-    elif "مدرس" in intent or "صورة" in intent or "كتاب" in intent or "حل" in intent:
-        st.session_state["ai_screen_action"] = "TARGET_TEACHER"
-        return "🤖 جيميناي يوجهك: تم توجيه السهم نحو '📚 المعلم الذكي والـ Vision AI'. يمكنك هناك رفع صور كتابك المدرسي ليتم حله فورا."
-    else:
-        st.session_state["ai_screen_action"] = None
-        return "🤖 جيميناي يوجهك: أنا أتحكم بالشاشة لمساعدتك! إذا كنت محتاراً، فقط اكتب لي (أريد الاشتراك) أو (أريد المدرس) وسأحرك الأسهم وأريك أين تضغط!"
+if username:
+    st.sidebar.success("المستخدم: " + username)
 
-# -------------------------------------------------------------------
-# 4. إعداد القائمة الجانبية التفاعلية المتحكم بها عبر الـ AI
-# -------------------------------------------------------------------
-st.sidebar.markdown("<h1 style='text-align: center; color: #00b4d8;'>Number One</h1>", unsafe_allow_html=True)
-st.sidebar.markdown("<p style='text-align: center;'>المنصة الذكية الموجهة بالكامل بالـ AI</p>", unsafe_allow_html=True)
-st.sidebar.write("---")
+    if st.sidebar.button("تسجيل الخروج"):
+        st.session_state.pop("username", None)
+        st.rerun()
+else:
+    st.sidebar.info("تصفح الموقع مجانًا")
 
-# توليد الأسهم المتحركة بصرياً بناء على الكوبيلوت
-arrow_reg = "<span class='ai-pointer-arrow'>👈</span>" if st.session_state["ai_screen_action"] == "TARGET_REGISTER" else ""
-arrow_teach = "<span class='ai-pointer-arrow'>👈</span>" if st.session_state["ai_screen_action"] == "TARGET_TEACHER" else ""
-arrow_supp = "<span class='ai-pointer-arrow'>👈</span>" if st.session_state["ai_screen_action"] == "TARGET_SUPPORT" else ""
-arrow_own = "<span class='ai-pointer-arrow'>👈</span>" if st.session_state["ai_screen_action"] == "TARGET_OWNER" else ""
 
-menu = st.sidebar.radio("🗺️ التنقل التلقائي الموجه في المنصة:", [
-    f"🔐 تسجيل الدخول والاشتراك {arrow_reg}",
-    f"📚 المعلم الذكي والـ Vision AI (نص + صور) {arrow_teach}",
-    f"📞 خدمة العملاء (اترك رقمك للتواصل) {arrow_supp}",
-    "💸 نظام التسويق بالعمولة (Affiliate)",
-    f"🔑 لوحة تحكم المالك مروان {arrow_own}"
-])
+# =====================================
+# الرئيسية
+# =====================================
 
-# -------------------------------------------------------------------
-# 5. المساعد العائم الحركي بأعلى الموقع لمساعدة المحتارين دائماً
-# -------------------------------------------------------------------
-st.write("---")
-with st.container():
-    st.markdown("### 🧠 جيميناي المتحكم المباشر والموجه البصري للشاشة")
-    st.info("👋 محتار وضائع في الموقع ولا تعرف أين تذهب؟ اكتب لي أي شيء تحتاجه بالأسفل وسأقوم بتحريك مؤشر الماوس والأسهم على الشاشة وأريك أين تضغط بدقة!")
-    
-    col_in, col_bt = st.columns([8, 2])
-    with col_in:
-        guide_query = st.text_input("💬 اسأل جيميناي ليوجه شاشتك الآن (مثال: أريد الاشتراك، أريد الدعم):", key="director_q")
-    with col_bt:
-        st.write("<br>", unsafe_allow_html=True)
-        btn_trigger = st.button("اطلب توجيه الماوس والأسهم 🚀", use_container_width=True)
-        
-    if btn_trigger and guide_query:
-        director_reply = run_ai_copilot_director(guide_query)
-        st.markdown(f"<div style='background-color:#1e1e1e; padding:15px; border-radius:10px; border-left: 5px solid #FF4B4B;'>{director_reply}</div>", unsafe_allow_html=True)
-st.write("---")
+if page == "🏠 الرئيسية":
 
-# -------------------------------------------------------------------
-# 6. تفاصيل وتشغيل صفحات وقوائم الموقع
-# -------------------------------------------------------------------
+    st.subheader("مرحبًا بك في NUMBER ONE")
 
-# [أ] واجهة التسجيل والاشتراك وبوابات المحافظ الرقمية
-if "🔐 تسجيل الدخول والاشتراك" in menu:
-    css_class = "highlight-target" if st.session_state["ai_screen_action"] == "TARGET_REGISTER" else "normal-box"
-    
-    st.markdown(f"<div class='{css_class}'><h2>🔐 بوابة الحسابات وتفعيل خطط Number One</h2><p>الاشتراك الشهري الاحترافي بقيمة 10 دولارات فقط.</p></div>", unsafe_allow_html=True)
-    
-    tab1, tab2 = st.tabs(["تسجيل الدخول", "إنشاء حساب وتفعيل الاشتراك فورا"])
-    with tab1:
-        login_email = st.text_input("البريد الإلكتروني:", key="l_em")
-        login_pass = st.text_input("كلمة المرور:", type="password", key="l_ps")
-        if st.button("دخول للحساب", use_container_width=True):
-            if login_email == owner_email and login_pass == owner_pass_raw:
-                st.success("مرحباً بك يا مروان العلواني! يمكنك الانتقال إلى قسم لوحة المالك مباشرة من القائمة.")
-            else:
-                cursor.execute("SELECT email, plan_type FROM users WHERE email=? AND password_hash=?", (login_email, hash_password(login_pass)))
-                user_found = cursor.fetchone()
-                if user_found:
-                    st.session_state['user_logged'] = user_found[0]
-                    st.success(f"تم الدخول! خطتك الحالية: {user_found[1]}")
-                else:
-                    st.error("بيانات الحساب غير صحيحة.")
-                    
-    with tab2:
-        new_email = st.text_input("بريدك الإلكتروني الجديد:")
-        new_pass = st.text_input("اختر كلمة مرور قوية:", type="password")
-        ref_code = st.text_input("كود الإحالة والتسويق بالعمولة (إن وجد):")
-        
-        pay_method = st.selectbox("اختر بوابة الدفع المتاحة:", [
-            "بوابة السداد الفوري - محفظة ون كاش (One Cash API)",
-            "المحافظ اليمنية الأخرى (كاش، جوالي، فلوسك، جيب)",
-            "عبر شبكات الصرافة المحلية (النجم، الامتياز، المريسي وكل الصرافين)",
-            "بوابة PayPal العالمية لليمنيين المغتربين في الخارج"
-        ])
-        currency = st.selectbox("اختر عملة السداد:", ["دولار أمريكي ($)", "ريال يمني (YR)", "ريال سعودي (SAR)"])
-        ref_num = st.text_input("أدخل رقم الحوالة / الإشعار المرجعي للتأكيد والمطابقة:")
-        
-        final_amt = 10.0
-        if currency == "ريال يمني (YR)": final_amount_calc = 10.0 * 530
-        elif currency == "ريال سعودي (SAR)": final_amount_calc = 10.0 * 3.75
-        else: final_amount_calc = 10.0
-        
-        st.info(f"المبلغ المطلوب تحويله: {final_amount_calc:,.2f} {currency}")
-        
-        if st.button("تأكيد السداد وإنشاء حسابي تلقائياً"):
-            if new_email and new_pass and ref_num:
-                try:
-                    user_own_ref = "REF-" + hashlib.md5(new_email.encode()).hexdigest()[:6].upper()
-                    pwd_h = hash_password(new_pass)
-                    initial_status = "نشط" if "One Cash" in pay_method else "معلق بانتظار التأكيد"
-                    
-                    cursor.execute("""
-                        INSERT INTO users (email, password_hash, plan_type, status, currency, amount, affiliate_code, referred_by)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                        (new_email, pwd_h, "شهري", initial_status, currency, final_amount_calc, user_own_ref, ref_code))
-                    conn.commit()
-                    st.success(f"🎉 تم تسجيل طلبك بنجاح! حالة الحساب الحالية: {initial_status}.")
-                except sqlite3.IntegrityError:
-                    st.error("هذا الحساب مسجل مسبقاً.")
+    st.write(
+        "منصة تساعدك على إعداد أفكار الإعلانات "
+        "وكتابة أوصاف جاهزة لأدوات التصميم."
+    )
 
-# [ب] واجهة المعلم الذكي والذكاء الاصطناعي البصري Vision
-elif "📚 المعلم الذكي" in menu:
-    css_class = "highlight-target" if st.session_state["ai_screen_action"] == "TARGET_TEACHER" else "normal-box"
-    st.markdown(f"<div class='{css_class}'><h2>📚 المعلم الذكي والـ Vision AI لشركة Number One</h2><p>التقط صورة لدرسك أو مسألتك الصعبة وسيقوم Gemini بحلها فورا وشرحها لك.</p></div>", unsafe_allow_html=True)
-    
-    uploaded_file = st.file_uploader("📸 ارفع صورة المسألة أو المنهج الدراسي هنا:", type=["jpg", "jpeg", "png"])
-    user_text = st.text_input("✍️ اكتب سؤالك التعليمي المكمل للـ AI:")
-    
-    if st.button("إرسال وتحليل البيانات بواسطة Gemini"):
-        if user_text or uploaded_file:
-            with st.spinner("جاري صياغة وتحليل الشروحات المنهجية..."):
-                img_input = Image.open(uploaded_file) if uploaded_file else None
-                reply = call_gemini_mega(prompt=user_text, image=img_input, system_instruction="أنت معلم ذكي لشركة Number One")
-                if img_input: st.image(img_input, width=250)
-                st.chat_message("assistant").write(reply)
+    c1, c2, c3 = st.columns(3)
 
-# [ج] واجهة خدمة العملاء الذكية مع خانة رقم التواصل للزبون وحفظها
-elif "📞 خدمة العملاء" in menu:
-    css_class = "highlight-target" if st.session_state["ai_screen_action"] == "TARGET_SUPPORT" else "normal-box"
-    st.markdown(f"<div class='{css_class}'><h2>📞 مركز خدمة العملاء بالذكاء الاصطناعي AI</h2><p>ضع رقم تواصلك وسؤالك، وسيرد الـ AI عليك فوراً مع حفظ رقمك لمتابعته من الإدارة.</p></div>", unsafe_allow_html=True)
-    
-    customer_phone = st.text_input("📱 أدخل رقم هاتفك أو حساب الواتساب الخاص بك (مثال: 77xxxxxxx):")
-    customer_msg = st.text_area("💬 اكتب تفاصيل استفسارك أو مشكلتك الفنية:")
-    
-    if st.button("إرسال رسالتي لخدمة العملاء AI"):
-        if customer_phone and customer_msg:
-            with st.spinner("جاري صياغة رد خدمة العملاء الفوري..."):
-                ai_reply = call_gemini_mega(prompt=customer_msg, system_instruction="أنت خبير خدمة عملاء منصة Number One لصاحبها مروان العلواني.")
-                
-                # حفظ رقم الهاتف والرسالة في قاعدة البيانات ليراها مروان لاحقاً
-                cursor.execute("INSERT INTO customer_leads (client_phone, client_message, ai_reply) VALUES (?, ?, ?)", (customer_phone, customer_msg, ai_reply))
-                conn.commit()
-                
-                st.success("✅ تم إرسال رسالتك وحفظ رقم تواصلك في نظام شركة Number One بنجاح!")
-                st.chat_message("assistant").write(ai_reply)
-        else:
-            st.error("الرجاء إدخال رقم هاتفك وتفاصيل الرسالة.")
+    with c1:
+        st.markdown("""
+        <div class="card">
+            <h3 class="gold">🎨 القوالب</h3>
+            <p>أفكار إعلانية لمجالات متنوعة.</p>
+        </div>
+        """, unsafe_allow_html=True)
 
-# [د] نظام التسويق بالعمولة (Affiliate System) أرباح المستخدمين
-elif "💸 نظام التسويق" in menu:
-    st.title("💸 نظام Number One للأرباح والتسويق بالعمولة")
-    if 'user_logged' not in st.session_state:
-        st.warning("🔒 يرجى تسجيل الدخول أولاً من التبويب الأول لتتمكن من توليد كود إحالتك ومراقبة عمولاتك.")
-    else:
-        cursor.execute("SELECT affiliate_code, balance_usd FROM users WHERE email=?", (st.session_state['user_logged'],))
-        aff_code, aff_bal = cursor.fetchone()
-        st.info(f"🔗 كود الإحالة الخاص بك لمشاركته وكسب الأموال: **{aff_code}**")
-        st.metric(label="💰 رصيد أرباحك الحالية القابلة للسحب لمحفظتك", value=f"${aff_bal:.2f} USD")
+    with c2:
+        st.markdown("""
+        <div class="card">
+            <h3 class="gold">🤖 صانع الإعلان</h3>
+            <p>أنشئ وصفًا إعلانيًا يناسب مشروعك.</p>
+        </div>
+        """, unsafe_allow_html=True)
 
-# [هـ] واجهة المالك المحمية والمشفرة بالكامل لـ مروان العلواني
-elif "🔑 لوحة تحكم المالك" in menu:
-    css_class = "highlight-target" if st.session_state["ai_screen_action"] == "TARGET_OWNER" else "normal-box"
-    st.markdown(f"<div class='{css_class}'><h2>🔒 الإدارة المركزية والرقابة المالية العامة - مروان العلواني</h2></div>", unsafe_allow_html=True)
-    
-    if 'owner_logged' not in st.session_state: st.session_state['owner_logged'] = False
-        
-    if not st.session_state['owner_logged']:
-        ow_em = st.text_input("بريد المالك المصرح له:", value="marwanabdh66@gmail.com")
-        ow_ps = st.text_input("كلمة مرور المالك الآمنة والمحمية برمجياً:", type="password")
-        if st.button("تسجيل الدخول بأمان إلى البيانات"):
-            if ow_em == owner_email and hash_password(ow_ps) == owner_hash:
-                st.session_state['owner_logged'] = True
-                st.success("أهلاً بك يا مروان العلواني، تم التصريح بالولوج الآمن.")
-                st.rerun()
-            else:
-                st.error("بيانات المرور والأمان غير متطابقة.")
-    else:
-        st.success("👋 لوحة تحكم مروان العلواني النشطة - مالك شركة Number One")
-        if st.button("خروج آمن من لوحة الإدارة"):
-            st.session_state['owner_logged'] = False
-            st.rerun()
-            
-        st.write("---")
-        # حسبة التوزيع المالي الصارمة المطلوبة من مروان العلواني:
-        # من كل 10 دولارات لاشتراك شهري نشط: 5 دولارات لحسابك البنكي كرسوم للـ AI، والصافي الـ 5 دولارات الباقية تذهب لمحفظة ون كاش
-        cursor.execute("SELECT COUNT(*) FROM users WHERE status='نشط' AND plan_type='شهري'")
-        active_monthly_count = cursor.fetchone()[0] or 0
-        
-        bank_share = active_monthly_count * 5
-        wincash_share = active_monthly_count * 5
-        
-        st.subheader("📊 تقرير التوزيعات والمحاسبة التلقائية للأموال")
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            st.metric(label="👥 إجمالي المشتركين الشهريين النشطين", value=f"{active_monthly_count} مستخدم")
-        with c2:
-            st.metric(label="📲 الصافي المرحل تلقائياً لـ (محفظة ون كاش الخاصة بك)", value=f"${wincash_share:.2f} USD")
-        with c3:
-            st.metric(label="🏦 حصة تكلفة الـ AI المحولة لـ (محفظتك البنكية مباشرة)", value=f"${bank_share:.2f} USD")
-            
-        st.write("---")
-        # عرض الإضافة الجديدة: أرقام هواتف عملاء خدمة العملاء ليتابعهم مروان
-        st.subheader("📱 أرقام الهواتف والرسائل المستلمة في خدمة العملاء (AI Leads)")
-        cursor.execute("SELECT id, client_phone, client_message, timestamp FROM customer_leads ORDER BY timestamp DESC")
-        leads_data = cursor.fetchall()
-        if leads_data:
-            df_leads = pd.DataFrame(leads_data, columns=["المعرف", "رقم هاتف الزبون", "تفاصيل رسالته", "تاريخ الإرسال"])
-            st.dataframe(df_leads, use_container_width=True)
-        else:
-            st.info("لا توجد رسائل أو أرقام زبائن مستلمة في خدمة العملاء حالياً.")
+    with c3:
+        st.markdown("""
+        <div class="card">
+            <h3 class="gold">💎 Pro</h3>
+            <p>نظام اشتراكات قابل للتطوير.</p>
+        </div>
+        """, unsafe_allow_html=True)
 
-        st.write("---")
-        # واجهة الموافقة اليدوية على الحوالات المعلقة (الصرافين والمحافظ) وتفعيلها
-        st.subheader("⏳ طلبات المشتركين عبر الحوالات والصرافين بانتظار تفعيلك")
-        cursor.execute("SELECT id, email, currency, amount FROM users WHERE status='معلق بانتظار التأكيد'")
-        pending_list = cursor.fetchall()
-        if pending_list:
-            for p_user in pending_list:
-                with st.expander(f"حوالة معلقة من الحساب البنكي: {p_user[1]}"):
-                    st.write(f"المبلغ المسدد بالعملة المختارة: {p_user[3]} {p_user[2]}")
-                    if st.button(f"تأكيد استلام السداد وتنشيط حساب {p_user[1]} الآن", key=f"activate_btn_{p_user[0]}"):
-                        cursor.execute("UPDATE users SET status='نشط' WHERE id=?", (p_user[0],))
-                        conn.commit()
-                        st.success("تم تنشيط الحساب بنجاح وترحيل الأموال إلى الرصيد المالي المباشر!")
-                        st.rerun()
-        else:
-            st.info("لا توجد طلبات معلقة بانتظار المراجعة حالياً.")
+    st.markdown("### كيف تستخدم الموقع؟")
 
-conn.close()
+    st.write("1. اختر مجال الإعلان.")
+    st.write("2. أدخل اسم مشروعك.")
+    st.write("3. أنشئ وصف الإعلان.")
+    st.write("4. نزّل الوصف واستخدمه في أداة التصميم.")
 
+    st.info(
+        "توليد الصور والفيديوهات فعليًا يحتاج إلى ربط "
+        "خدمة ذكاء اصطناعي خارجية."
+    )
+
+
+# =====================================
+# قوالب الإعلانات
+# =====================================
+
+elif page == "🎨 قوالب الإعلانات":
+
+    st.subheader("🎨 مكتبة القوالب والأفكار")
+
+    templates = {
+        "🍔 المطاعم": [
+            "إعلان برغر سينمائي",
+            "عرض وجبة عائلية",
+            "إعلان قهوة فاخر",
+            "إعلان افتتاح مطعم"
+        ],
+        "🏠 العقارات": [
+            "إعلان شقة للبيع",
+            "إعلان فيلا فاخرة",
+            "إعلان أرض استثمارية",
+            "إعلان مشروع سكني"
+        ],
+        "🛍️ المتاجر": [
+            "إعلان تخفيضات",
+            "إعلان منتج جديد",
+            "إعلان متجر إلكتروني",
+            "إعلان ملابس"
+        ],
+        "💈 الخدمات": [
+            "إعلان صالون",
+            "إعلان مركز تجميل",
+            "إعلان صيانة",
+            "إعلان مركز تعليمي"
+        ],
+        "💻 التقنية": [
+            "إعلان تطبيق",
+            "إعلان متجر إلكترونيات",
+            "إعلان خدمة رقمية",
+            "إعلان دورة تدريبية"
+        ]
+    }
+
+    category = st.selectbox("اختر المجال", list(templates.keys()))
+
+    template = st.selectbox(
+        "اختر القالب",
+        templates[category]
+    )
+
+    st.markdown(f"""
+    <div class="card">
+        <h3 class="gold">{template}</h3>
+        <p>طوّر هذه الفكرة لتناسب مشروعك وعملاءك.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    if st.button("استخدام القالب"):
+        st.session_state["template"] = template
+        st.success("تم الاختيار. انتقل إلى صانع الإعلان.")
+
+
+# =====================================
+# صانع الإعلان
+# =====================================
+
+elif page == "🤖 صانع الإعلان":
+
+    st.subheader("🤖 صانع وصف الإعلان")
+
+    business = st.text_input(
+        "اسم المشروع",
+        placeholder="مثال: مطعم النخبة"
+    )
+
+    category = st.selectbox(
+        "نوع الإعلان",
+        ["مطاعم", "عقارات", "متاجر", "خدمات", "تقنية", "تعليم", "عام"]
+    )
+
+    audience = st.selectbox(
+        "الجمهور المستهدف",
+        ["الجميع", "الشباب", "العائلات", "أصحاب الأعمال", "العملاء المحليون"]
+    )
+
+    style = st.selectbox(
+        "أسلوب التصميم",
+        [
+            "فاخر وهادئ",
+            "عصري وجريء",
+            "سينمائي",
+            "بسيط وأنيق",
+            "ملون وجذاب",
+            "تقني ومستقبلي"
+        ]
+    )
+
+    details = st.text_area(
+        "تفاصيل المنتج أو العرض",
+        value=st.session_state.get("template", ""),
+        placeholder="اكتب السعر والخصومات ومميزات المنتج..."
+    )
+
+    if st.button("✨ إنشاء وصف الإعلان"):
+
+        if not business.strip() or not details.strip():
+            st.warning("أدخل اسم المشروع وتفاصيل الإعلان.")
+        else:
+            prompt = f"""
+NUMBER ONE — ADVERTISEMENT BRIEF
+
+Business: {business}
+Category: {category}
+Audience: {audience}
+Style: {style}
+
+Details:
+{details}
+
+Create a professional advertising concept for social media.
+Use an attractive composition, readable typography,
+appropriate colors, beautiful lighting and a clear call to action.
+Make the business name prominent.
+Avoid spelling mistakes and unnecessary visual clutter.
+"""
+
+            st.session_state["prompt"] = prompt
+
+    if st.session_state.get("prompt"):
+
+        st.markdown("### وصف الإعلان الناتج")
+
+        st.text_area(
+            "يمكنك نسخ الوصف",
+            value=st.session_state["prompt"],
+            height=250
+        )
+
+        st.download_button(
+            "📥 تنزيل الوصف",
+            data=st.session_state["prompt"],
+            file_name="number_one_ad.txt",
+            mime="text/plain"
+        )
+
+
+# =====================================
+# طلب تصميم
+# =====================================
+
+elif page == "🎬 طلب تصميم":
+
+    st.subheader("🎬 طلب تصميم إعلان")
+
+    if not username:
+        st.warning("سجّل الدخول أولًا.")
+    else:
+        category = st.selectbox(
+            "نوع التصميم",
+            ["إعلان صورة", "فيديو موشن جرافيك", "مطعم", "عقارات", "متجر", "أخرى"]
+        )
+
+        details = st.text_area("اشرح التصميم المطلوب")
+        contact = st.text_input("رقم واتساب أو وسيلة التواصل")
+
+        if st.button("إرسال طلب التصميم"):
+
+            if not details.strip() or not contact.strip():
+                st.error("أكمل تفاصيل الطلب ووسيلة التواصل.")
+            else:
+                con = connect_db()
+
+                con.execute("""
+                    INSERT INTO orders
+                    (username, category, details, contact, created)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (
+                    username,
+                    category,
+                    details,
+                    contact,
+                    datetime.now().strftime("%Y-%m-%d %H:%M")
+                ))
+
+                con.commit()
+                con.close()
+
+                st.success("تم حفظ طلبك في الموقع.")
+                st.info("الطلب لم يُرسل إلى مصمم أو واتساب تلقائيًا.")
+
+
+# =====================================
+# الاشتراكات
+# =====================================
+
+elif page == "💎 الاشتراكات":
+
+    st.subheader("💎 خطط الاشتراك")
+
+    c1, c2 = st.columns(2)
+
+    with c1:
+        st.markdown("""
+        <div class="card">
+            <h2 class="gold">🆓 Free</h2>
+            <h3>مجانية</h3>
+            <hr>
+            <p>✔ تصفح القوالب</p>
+            <p>✔ كتابة أوصاف الإعلانات</p>
+            <p>✔ تنزيل النصوص</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with c2:
+        st.markdown("""
+        <div class="card">
+            <h2 class="gold">👑 Pro</h2>
+            <h3>اشتراك مدفوع</h3>
+            <hr>
+            <p>✔ مزايا الخطة المجانية</p>
+            <p>✔ قابل لإضافة قوالب حصرية</p>
+            <p>✔ قابل لربط أدوات الذكاء الاصطناعي</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.warning(
+        "المزايا المدفوعة الإضافية تحتاج إلى تطوير فعلي قبل بيع الاشتراك."
+    )
+
+
+# =====================================
+# طلب الدفع
+# =====================================
+
+elif page == "💳 طلب الدفع":
+
+    st.subheader("💳 طلب اشتراك Pro")
+
+    if not username:
+        st.warning("سجّل الدخول أولًا.")
+    else:
+        st.info(
+            "أضف بيانات محفظتك اليمنية أو حسابك البنكي الحقيقية "
+            "إلى الموقع قبل استقبال المدفوعات."
+        )
+
+        method = st.selectbox(
+            "طريقة الدفع",
+            ["محفظة محلية", "تحويل بنكي", "طريقة أخرى"]
+        )
+
+        amount = st.text_input("المبلغ والعملة")
+        reference = st.text_input("رقم العملية أو مرجع التحويل")
+
+        if st.button("إرسال طلب الدفع"):
+
+            if not amount.strip() or not reference.strip():
+                st.error("أدخل المبلغ ورقم العملية.")
+            else:
+                con = connect_db()
+
+                con.execute("""
+                    INSERT INTO payments
+                    (username, method, amount, reference, status, created)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    username,
+                    method,
+                    amount,
+                    reference,
+                    "قيد المراجعة",
+                    datetime.now().strftime("%Y-%m-%d %H:%M")
+                ))
+
+                con.commit()
+                con.close()
+
+                st.success("تم إرسال طلب الدفع للمراجعة.")
+                st.info("سيحتاج المسؤول إلى التحقق من التحويل يدويًا.")
+
+
+# =====================================
+# حساب المستخدم
+# =====================================
+
+elif page == "👤 حسابي":
+
+    if not username:
+        st.warning("سجّل الدخول لعرض حسابك.")
+    else:
+        con = connect_db()
+
+        user = con.execute(
+            "SELECT username, plan, created FROM users WHERE username=?",
+            (username,)
+        ).fetchone()
+
+        payments = con.execute("""
+            SELECT method, amount, status, created
+            FROM payments
+            WHERE username=?
+            ORDER BY id DESC
+        """, (username,)).fetchall()
+
+        con.close()
+
+        if user:
+            st.subheader("👤 حسابي")
+
+            st.markdown(f"""
+            <div class="card">
+                <h3 class="gold">مرحبًا {user[0]}</h3>
+                <p>الخطة الحالية: {user[1]}</p>
+                <p>تاريخ التسجيل: {user[2]}</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("### طلبات الدفع السابقة")
+
+        if payments:
+            st.dataframe(
+                [dict(p) for p in payments],
+                use_container_width=True
+            )
+        else:
+            st.info("لا توجد طلبات دفع حتى الآن.")
+
+
+# =====================================
+# تسجيل الدخول
+# =====================================
+
+elif page == "🔐 تسجيل الدخول":
+
+    st.subheader("🔐 تسجيل الدخول")
+
+    with st.form("login_form"):
+        login_name = st.text_input("اسم المستخدم")
+        login_password = st.text_input("كلمة المرور", type="password")
+        submitted = st.form_submit_button("دخول")
+
+    if submitted:
+        user = login_user(login_name, login_password)
+
+        if user:
+            st.session_state["username"] = user["username"]
+            st.success("تم تسجيل الدخول.")
+            st.rerun()
+        else:
+            st.error("اسم المستخدم أو كلمة المرور غير صحيحة.")
+
+
+# =====================================
+# إنشاء حساب
+# =====================================
+
+elif page == "📝 إنشاء حساب":
+
+    st.subheader("📝 إنشاء حساب جديد")
+
+    with st.form("register_form"):
+        new_name = st.text_input("اسم المستخدم")
+        new_password = st.text_input("كلمة المرور", type="password")
+        confirm_password = st.text_input("تأكيد كلمة المرور", type="password")
+
+        submitted = st.form_submit_button("إنشاء الحساب")
+
+    if submitted:
+
+        if len(new_name.strip()) < 3:
+            st.error("اسم المستخدم يجب أن يكون 3 أحرف على الأقل.")
+
+        elif len(new_password) < 8:
+            st.error("كلمة المرور يجب أن تكون 8 أحرف على الأقل.")
+
+        elif new_password != confirm_password:
+            st.error("كلمتا المرور غير متطابقتين.")
+
+        elif register_user(new_name, new_password):
+            st.success("تم إنشاء الحساب. انتقل إلى تسجيل الدخول.")
+
+        else:
+            st.error("اسم المستخدم موجود مسبقًا.")
+
+
+# =====================================
+# التواصل
+# =====================================
+
+elif page == "📞 التواصل":
+
+    st.subheader("📞 تواصل معنا")
+
+    name = st.text_input("اسمك")
+    contact = st.text_input("رقم التواصل")
+    message = st.text_area("رسالتك")
+
+    if st.button("تجهيز الرسالة"):
+
+        if not name.strip() or not message.strip():
+            st.warning("أدخل اسمك ورسالتك.")
+        else:
+            text = (
+                f"الاسم: {name}\n"
+                f"التواصل: {contact}\n"
+                f"الرسالة: {message}"
+            )
+
+            st.text_area("رسالتك الجاهزة", value=text, height=150)
+
+            st.download_button(
+                "تنزيل الرسالة",
+                data=text,
+                file_name="number_one_message.txt"
+            )
+
+
+# =====================================
+# لوحة الإدارة
+# =====================================
+
+elif page == "🛡️ الإدارة":
+
+    st.subheader("🛡️ لوحة الإدارة")
+
+    admin_name = st.secrets.get("ADMIN_USERNAME", "")
+    admin_password = st.secrets.get("ADMIN_PASSWORD", "")
+
+    if not admin_name or not admin_password:
+        st.error(
+            "لوحة الإدارة تحتاج إلى إعداد ADMIN_USERNAME "
+            "و ADMIN_PASSWORD في Streamlit Secrets."
+        )
+
+    else:
+
+        if not st.session_state.get("admin_ok"):
+
+            with st.form("admin_form"):
+                entered_name = st.text_input("اسم المسؤول")
+                entered_password = st.text_input(
+                    "كلمة مرور المسؤول",
+                    type="password"
+                )
+
+                submitted = st.form_submit_button("دخول الإدارة")
+
+            if submitted:
+
+                if (
+                    secrets.compare_digest(entered_name, admin_name)
+                    and secrets.compare_digest(entered_password, admin_password)
+                ):
+                    st.session_state["admin_ok"] = True
+                    st.rerun()
+                else:
+                    st.error("بيانات المسؤول غير صحيحة.")
+
+        if st.session_state.get("admin_ok"):
+
+            if st.button("خروج المسؤول"):
+                st.session_state["admin_ok"] = False
+                st.rerun()
+
+            con = connect_db()
+
+            st.markdown("### المستخدمون")
+
+            users = con.execute("""
+                SELECT id, username, plan, created
+                FROM users ORDER BY id DESC
+            """).fetchall()
+
+            if users:
+                st.dataframe(
+                    [dict(u) for u in users],
+                    use_container_width=True
+                )
+            else:
+                st.info("لا يوجد مستخدمون حتى الآن.")
+
+            st.markdown("### طلبات الدفع")
+
+            payments = con.execute("""
+                SELECT * FROM payments ORDER BY id DESC
+            """).fetchall()
+
+            if payments:
+                st.dataframe(
+                    [dict(p) for p in payments],
+                    use_container_width=True
+                )
+            else:
+                st.info("لا توجد طلبات دفع.")
+
+            con.close()
+
+            st.markdown("### مراجعة الدفع")
+
+            payment_id = st.number_input(
+                "رقم طلب الدفع",
+                min_value=1,
+                step=1
+            )
+
+            status = st.selectbox(
+                "حالة الطلب",
+                ["قيد المراجعة", "تم التحقق من الدفع", "مرفوض"]
+            )
+
+            if st.button("حفظ حالة الطلب"):
+
+                con = connect_db()
+
+                payment = con.execute(
+                    "SELECT username FROM payments WHERE id=?",
+                    (int(payment_id),)
+                ).fetchone()
+
+                if payment:
+
+                    con.execute(
+                        "UPDATE payments SET status=? WHERE id=?",
+                        (status, int(payment_id))
+                    )
+
+                    if status == "تم التحقق من الدفع":
+                        con.execute(
+                            "UPDATE users SET plan='Pro' WHERE username=?",
+                            (payment[0],)
+                        )
+
+                    con.commit()
+                    st.success("تم تحديث الطلب.")
+                    st.rerun()
+
+                else:
+                    st.error("رقم الطلب غير موجود.")
+
+                con.close()
+
+            st.markdown("### طلبات التصميم")
+
+            con = connect_db()
+
+            orders = con.execute("""
+                SELECT * FROM orders ORDER BY id DESC
+            """).fetchall()
+
+            con.close()
+
+            if orders:
+                st.dataframe(
+                    [dict(o) for o in orders],
+                    use_container_width=True
+                )
+            else:
+                st.info("لا توجد طلبات تصميم.")
+
+
+# =====================================
+# نهاية الموقع
+# =====================================
+
+st.markdown("---")
+
+st.markdown("""
+<div style="text-align:center;color:#aab6ce;padding:12px">
+    <h3 style="color:#f0cc70">👑 NUMBER ONE</h3>
+    <p>من فكرتك تبدأ الحكاية.</p>
+</div>
+""", unsafe_allow_html=True)
