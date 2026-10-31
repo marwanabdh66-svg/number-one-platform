@@ -411,10 +411,8 @@ if page == "🏠 الرئيسية":
     st.write("3. أنشئ وصف الإعلان.")
     st.write("4. نزّل الوصف واستخدمه في أداة التصميم.")
 
-    st.info(
-        "توليد الصور والفيديوهات فعليًا يحتاج إلى ربط "
-        "خدمة ذكاء اصطناعي خارجية."
-    )
+    st.info("🎬 توليد الصور والفيديوهات مباشرة داخل المنصة: قريبًا.") 
+    st.caption("يمكنك حاليًا إنشاء وصف إعلاني وتجهيزه لاستخدامه في أدوات التصميم.")
 
 
 # =====================================
@@ -543,6 +541,8 @@ Avoid spelling mistakes and unnecessary visual clutter.
 
             st.session_state["prompt"] = prompt
 
+    st.info("🖼️ إنشاء الصور والفيديوهات تلقائيًا داخل NUMBER ONE: قريبًا.")
+
     if st.session_state.get("prompt"):
 
         st.markdown("### وصف الإعلان الناتج")
@@ -603,7 +603,7 @@ elif page == "🎬 طلب تصميم":
                 con.close()
 
                 st.success("تم حفظ طلبك في الموقع.")
-                st.info("الطلب لم يُرسل إلى مصمم أو واتساب تلقائيًا.")
+                st.info("إرسال الطلب تلقائيًا إلى مصمم أو واتساب ومتابعة التنفيذ المباشر: قريبًا.")
 
 
 # =====================================
@@ -635,14 +635,12 @@ elif page == "💎 الاشتراكات":
             <h3>اشتراك مدفوع</h3>
             <hr>
             <p>✔ مزايا الخطة المجانية</p>
-            <p>✔ قابل لإضافة قوالب حصرية</p>
-            <p>✔ قابل لربط أدوات الذكاء الاصطناعي</p>
+            <p>⏳ القوالب الحصرية: قريبًا</p>
+            <p>⏳ أدوات الذكاء الاصطناعي المتقدمة: قريبًا</p>
         </div>
         """, unsafe_allow_html=True)
 
-    st.warning(
-        "المزايا المدفوعة الإضافية تحتاج إلى تطوير فعلي قبل بيع الاشتراك."
-    )
+    st.info("تفعيل مزايا Pro المدفوعة وبيع الاشتراكات تلقائيًا: قريبًا. لن يتم تحصيل أي مبلغ تلقائيًا حاليًا.")
 
 
 # =====================================
@@ -656,10 +654,7 @@ elif page == "💳 طلب الدفع":
     if not username:
         st.warning("سجّل الدخول أولًا.")
     else:
-        st.info(
-            "أضف بيانات محفظتك اليمنية أو حسابك البنكي الحقيقية "
-            "إلى الموقع قبل استقبال المدفوعات."
-        )
+        st.info("الدفع الإلكتروني المباشر وربط المحافظ والبنوك: قريبًا. طلب الدفع الحالي يُرسل للمراجعة اليدوية فقط.")
 
         method = st.selectbox(
             "طريقة الدفع",
@@ -841,6 +836,8 @@ elif page == "📞 التواصل":
     contact = st.text_input("رقم التواصل")
     message = st.text_area("رسالتك")
 
+    st.info("إرسال الرسائل مباشرة إلى فريق الدعم وحفظ سجل المحادثات: قريبًا.")
+
     if st.button("تجهيز الرسالة"):
 
         if not name.strip() or not message.strip():
@@ -917,6 +914,17 @@ elif page == "🛡️ الإدارة":
 
             con = connect_db()
 
+            users = con.execute("""
+                SELECT id, username, plan, created
+                FROM users ORDER BY id DESC
+            """).fetchall()
+            payments = con.execute("""
+                SELECT * FROM payments ORDER BY id DESC
+            """).fetchall()
+            orders = con.execute("""
+                SELECT * FROM orders ORDER BY id DESC
+            """).fetchall()
+
             st.markdown("### المستخدمون")
 
             users = con.execute("""
@@ -934,10 +942,6 @@ elif page == "🛡️ الإدارة":
 
             st.markdown("### طلبات الدفع")
 
-            payments = con.execute("""
-                SELECT * FROM payments ORDER BY id DESC
-            """).fetchall()
-
             if payments:
                 st.dataframe(
                     [dict(p) for p in payments],
@@ -947,6 +951,58 @@ elif page == "🛡️ الإدارة":
                 st.info("لا توجد طلبات دفع.")
 
             con.close()
+
+            st.markdown("### إضافة عملية دفع يدويًا")
+            st.caption("يمكن للمالك تسجيل عملية دفع استلمها خارج الموقع بعد التأكد منها بنفسه.")
+            with st.form("owner_add_payment_form"):
+                manual_username = st.selectbox(
+                    "اختر حساب المستخدم",
+                    [u["username"] for u in users],
+                    index=None,
+                    placeholder="اختر المستخدم"
+                )
+                manual_method = st.selectbox(
+                    "طريقة استلام الدفع",
+                    ["محفظة محلية", "تحويل بنكي", "نقدًا", "طريقة أخرى"]
+                )
+                manual_amount = st.text_input("المبلغ والعملة")
+                manual_reference = st.text_input("رقم العملية أو وصفها")
+                manual_status = st.selectbox(
+                    "حالة العملية",
+                    ["تم التحقق من الدفع", "قيد المراجعة", "مرفوض"]
+                )
+                add_manual_payment = st.form_submit_button(
+                    "إضافة عملية الدفع إلى حساب المستخدم"
+                )
+
+            if add_manual_payment:
+                if not users:
+                    st.error("لا يوجد مستخدمون لإضافة عملية دفع لهم.")
+                elif not manual_username or not manual_amount.strip() or not manual_reference.strip():
+                    st.error("اختر المستخدم وأدخل المبلغ ومرجع العملية.")
+                else:
+                    con = connect_db()
+                    con.execute("""
+                        INSERT INTO payments
+                        (username, method, amount, reference, status, created)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (
+                        manual_username,
+                        manual_method,
+                        manual_amount.strip(),
+                        manual_reference.strip(),
+                        manual_status,
+                        datetime.now().strftime("%Y-%m-%d %H:%M")
+                    ))
+                    if manual_status == "تم التحقق من الدفع":
+                        con.execute(
+                            "UPDATE users SET plan='Pro' WHERE username=?",
+                            (manual_username,)
+                        )
+                    con.commit()
+                    con.close()
+                    st.success("تمت إضافة عملية الدفع إلى سجل المستخدم.")
+                    st.rerun()
 
             st.markdown("### تحديث حالة طلب التصميم")
             if orders:
@@ -1020,14 +1076,6 @@ elif page == "🛡️ الإدارة":
                 con.close()
 
             st.markdown("### طلبات التصميم")
-
-            con = connect_db()
-
-            orders = con.execute("""
-                SELECT * FROM orders ORDER BY id DESC
-            """).fetchall()
-
-            con.close()
 
             # ملخص سريع ونسخ احتياطية قابلة للتنزيل من لوحة المالك
             st.markdown("### ملخص المنصة")
