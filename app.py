@@ -2,6 +2,7 @@ import streamlit as st
 import sqlite3
 import hashlib
 import secrets
+import html
 from datetime import datetime
 
 # =====================================
@@ -271,18 +272,11 @@ hr {
 # رأس الموقع
 # =====================================
 
-st.markdown("""
-<div class="hero">
-    <h1>👑 NUMBER ONE</h1>
-    <p>استوديو الإعلانات والقوالب الإبداعية</p>
-    <p>اصنع فكرتك الإعلانية بأسلوب احترافي</p>
-</div>
-""", unsafe_allow_html=True)
-
-
 # =====================================
 # القائمة الرئيسية
 # =====================================
+
+username = st.session_state.get("username")
 
 pages = [
     "🏠 الرئيسية",
@@ -292,13 +286,14 @@ pages = [
     "💎 الاشتراكات",
     "💳 طلب الدفع",
     "👤 حسابي",
-    "🔐 تسجيل الدخول",
-    "📝 إنشاء حساب",
     "📞 التواصل",
     "🛡️ الإدارة"
 ]
 
-username = st.session_state.get("username")
+if not username:
+    pages.extend(["🔐 تسجيل الدخول", "📝 إنشاء حساب"])
+else:
+    pages = [p for p in pages if p not in ("🔐 تسجيل الدخول", "📝 إنشاء حساب")]
 
 # شريط تنقل علوي بدل القائمة الجانبية
 st.markdown("""
@@ -314,7 +309,7 @@ st.markdown("""
 
 if username:
     st.markdown(
-        f'<div class="welcome-strip">مرحبًا، <b>{username}</b> · يسعدنا وجودك في NUMBER ONE</div>',
+        f'<div class="welcome-strip">مرحبًا، <b>{html.escape(str(username))}</b> · يسعدنا وجودك في NUMBER ONE</div>',
         unsafe_allow_html=True
     )
 
