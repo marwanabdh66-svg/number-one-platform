@@ -151,10 +151,61 @@ html, body, [class*="css"] {
     color: #f5f7ff;
 }
 
-section[data-testid="stSidebar"] {
-    background: #0a1120;
-    border-left: 1px solid #344563;
+/* إلغاء القائمة الجانبية بالكامل */
+section[data-testid="stSidebar"],
+[data-testid="stSidebar"],
+button[kind="header"] {
+    display: none !important;
 }
+[data-testid="stAppViewContainer"] > .main {
+    margin-left: 0 !important;
+}
+.block-container {
+    max-width: 1440px;
+    padding-top: 1.4rem;
+    padding-bottom: 3rem;
+}
+.top-brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 22px;
+    margin: 0 0 18px;
+    border: 1px solid rgba(215,180,93,.45);
+    border-radius: 20px;
+    background: linear-gradient(110deg, rgba(28,45,75,.96), rgba(10,17,32,.96));
+    box-shadow: 0 12px 35px rgba(0,0,0,.18);
+}
+.brand-mark { font-size: 35px; }
+.brand-name { color: #f0cc70; font-size: 25px; font-weight: 800; letter-spacing: 1px; }
+.brand-caption { color: #b9c6dc; font-size: 12px; }
+.brand-status { margin-right: auto; color: #8ee0b0; font-size: 12px; }
+.welcome-strip {
+    padding: 10px 15px;
+    margin-bottom: 12px;
+    border-radius: 12px;
+    color: #e7edf8;
+    background: rgba(31,49,77,.7);
+    border: 1px solid #344663;
+}
+div[role="radiogroup"] {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    padding: 10px;
+    border: 1px solid #344663;
+    border-radius: 16px;
+    background: rgba(12,21,38,.92);
+    margin-bottom: 22px;
+}
+div[role="radiogroup"] label {
+    background: #192943;
+    border: 1px solid #344663;
+    border-radius: 11px;
+    padding: 7px 12px;
+}
+div[role="radiogroup"] label p { color: #eaf0fb; font-size: 13px; }
+
 
 .hero {
     background: linear-gradient(135deg, #192a49, #0b1221);
@@ -235,35 +286,51 @@ st.markdown("""
 
 pages = [
     "🏠 الرئيسية",
-    "🎨 قوالب الإعلانات",
+    "🎨 القوالب",
     "🤖 صانع الإعلان",
     "🎬 طلب تصميم",
     "💎 الاشتراكات",
-    "💳 طلب الدفع",
+    "💳 الدفع",
     "👤 حسابي",
-    "🔐 تسجيل الدخول",
-    "📝 إنشاء حساب",
+    "🔐 الدخول",
+    "📝 حساب جديد",
     "📞 التواصل",
     "🛡️ الإدارة"
 ]
 
-st.sidebar.markdown(
-    "<h2 style='color:#f0cc70;text-align:center'>👑 NUMBER ONE</h2>",
-    unsafe_allow_html=True
-)
-
-page = st.sidebar.radio("القائمة", pages)
-
 username = st.session_state.get("username")
 
-if username:
-    st.sidebar.success("المستخدم: " + username)
+# شريط تنقل علوي بدل القائمة الجانبية
+st.markdown("""
+<div class="top-brand">
+  <div class="brand-mark">👑</div>
+  <div>
+    <div class="brand-name">NUMBER ONE</div>
+    <div class="brand-caption">منصتك الإبداعية للتصميم والتجارة الرقمية</div>
+  </div>
+  <div class="brand-status">● المنصة متاحة</div>
+</div>
+""", unsafe_allow_html=True)
 
-    if st.sidebar.button("تسجيل الخروج"):
+if username:
+    st.markdown(
+        f'<div class="welcome-strip">مرحبًا، <b>{username}</b> · يسعدنا وجودك في NUMBER ONE</div>',
+        unsafe_allow_html=True
+    )
+
+page = st.radio(
+    "التنقل الرئيسي",
+    pages,
+    horizontal=True,
+    label_visibility="collapsed",
+    key="main_navigation"
+)
+
+nav_left, nav_right = st.columns([5, 1])
+with nav_right:
+    if username and st.button("تسجيل الخروج", key="top_logout"):
         st.session_state.pop("username", None)
         st.rerun()
-else:
-    st.sidebar.info("تصفح الموقع مجانًا")
 
 
 # =====================================
