@@ -21,4 +21,43 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       - name: فحص صياغة ملفات Python
-        run: python -m py_compile app.py
+        run: python -m py_compile app.py template_catalog.py project_store.py
+      - name: اختبار حفظ المشاريع وعزل بيانات المستخدمين
+        run: |
+          python - <<'PY'
+          import sqlite3
+          from project_store import initialize_projects_table, save_project, list_projects
+
+          connection = sqlite3.connect(":memory:")
+          connection.row_factory = sqlite3.Row
+          initialize_projects_table(connection)
+          project_id = save_project(
+              connection,
+              username="user-a",
+              title="اختبار مشروع",
+              prompt="وصف إعلان تجريبي",
+              template_id="NO-0001",
+              created="2026-10-31 12:00",
+          )
+          own_projects = list_projects(connection, "user-a")
+          other_projects = list_projects(connection, "user-b")
+          assert project_id == 1
+          assert len(own_projects) == 1
+          assert own_projects[0]["template_id"] == "NO-0001"
+          assert len(other_projects) == 0
+          connection.close()
+          print("PASS: project save, retrieval, and per-user isolation.")
+          PY
+      - name: اختبار عدد القوالب ومعاينة SVG
+        run: |
+          python - <<'PY'
+          from template_catalog import TEMPLATE_CATALOG, render_preview_svg
+
+          assert len(TEMPLATE_CATALOG) == 400, f"Expected 400 templates, got {len(TEMPLATE_CATALOG)}"
+          assert len({item["id"] for item in TEMPLATE_CATALOG}) == 400
+          assert len({(item["category"], item["topic"], item["format"]) for item in TEMPLATE_CATALOG}) == 400
+          preview = render_preview_svg(TEMPLATE_CATALOG[0])
+          assert preview.startswith("<svg")
+          assert "NUMBER ONE" in preview
+          print("PASS: 400 unique catalog entries and SVG preview generation.")
+          PY
