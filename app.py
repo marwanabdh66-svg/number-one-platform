@@ -22,7 +22,9 @@ DB = "number_one.db"
 # =====================================
 
 def connect_db():
-    return sqlite3.connect(DB, timeout=20)
+    con = sqlite3.connect(DB, timeout=20)
+    con.row_factory = sqlite3.Row
+    return con
 
 
 def setup_db():
