@@ -3,6 +3,8 @@ import sqlite3
 import hashlib
 import secrets
 import html
+import csv
+import io
 from datetime import datetime
 
 # =====================================
@@ -26,6 +28,18 @@ def connect_db():
     con = sqlite3.connect(DB, timeout=20)
     con.row_factory = sqlite3.Row
     return con
+
+
+def rows_to_csv(rows):
+    """تحويل نتائج قاعدة البيانات إلى ملف CSV مناسب لبرنامج الجداول."""
+    if not rows:
+        return "".encode("utf-8-sig")
+
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=list(rows[0].keys()))
+    writer.writeheader()
+    writer.writerows([dict(row) for row in rows])
+    return output.getvalue().encode("utf-8-sig")
 
 
 def setup_db():
@@ -960,6 +974,40 @@ elif page == "🛡️ الإدارة":
             """).fetchall()
 
             con.close()
+
+            # ملخص سريع ونسخ احتياطية قابلة للتنزيل من لوحة المالك
+            st.markdown("### ملخص المنصة")
+            metric_a, metric_b, metric_c = st.columns(3)
+            metric_a.metric("عدد المستخدمين", len(users))
+            metric_b.metric("طلبات الدفع", len(payments))
+            metric_c.metric("طلبات التصميم", len(orders))
+
+            st.markdown("### تنزيل التقارير")
+            export_a, export_b, export_c = st.columns(3)
+            with export_a:
+                st.download_button(
+                    "تنزيل المستخدمين",
+                    data=rows_to_csv(users),
+                    file_name="number_one_users.csv",
+                    mime="text/csv",
+                    disabled=not users
+                )
+            with export_b:
+                st.download_button(
+                    "تنزيل المدفوعات",
+                    data=rows_to_csv(payments),
+                    file_name="number_one_payments.csv",
+                    mime="text/csv",
+                    disabled=not payments
+                )
+            with export_c:
+                st.download_button(
+                    "تنزيل طلبات التصميم",
+                    data=rows_to_csv(orders),
+                    file_name="number_one_orders.csv",
+                    mime="text/csv",
+                    disabled=not orders
+                )
 
             if orders:
                 st.dataframe(
