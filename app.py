@@ -741,13 +741,20 @@ elif page == "🛡️ الإدارة":
 
     st.subheader("🛡️ لوحة الإدارة")
 
-    admin_name = st.secrets.get("ADMIN_USERNAME", "")
-    admin_password = st.secrets.get("ADMIN_PASSWORD", "")
+    # يدعم أسماء الأسرار القديمة والجديدة حتى لا تتعطل إعدادات المالك الحالية
+    admin_name = st.secrets.get(
+        "NUMBER_ONE_OWNER_USERNAME",
+        st.secrets.get("ADMIN_USERNAME", "")
+    )
+    admin_password = st.secrets.get(
+        "NUMBER_ONE_OWNER_PASSWORD",
+        st.secrets.get("ADMIN_PASSWORD", "")
+    )
 
     if not admin_name or not admin_password:
         st.error(
-            "لوحة الإدارة تحتاج إلى إعداد ADMIN_USERNAME "
-            "و ADMIN_PASSWORD في Streamlit Secrets."
+            "لوحة الإدارة تحتاج إلى إعداد NUMBER_ONE_OWNER_USERNAME "
+            "و NUMBER_ONE_OWNER_PASSWORD في أسرار الاستضافة."
         )
 
     else:
