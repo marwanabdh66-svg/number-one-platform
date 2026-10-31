@@ -29,7 +29,7 @@ jobs:
 
           assert len(TEMPLATE_CATALOG) == 400, f"Expected 400 templates, got {len(TEMPLATE_CATALOG)}"
           assert len({item["id"] for item in TEMPLATE_CATALOG}) == 400
-          assert len({item["title"] for item in TEMPLATE_CATALOG}) == 400
+          assert len({(item["category"], item["topic"], item["format"]) for item in TEMPLATE_CATALOG}) == 400
           preview = render_preview_svg(TEMPLATE_CATALOG[0])
           assert preview.startswith("<svg")
           assert "NUMBER ONE" in preview
