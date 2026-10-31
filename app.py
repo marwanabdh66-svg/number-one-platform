@@ -620,6 +620,13 @@ elif page == "👤 حسابي":
             ORDER BY id DESC
         """, (username,)).fetchall()
 
+        orders = con.execute("""
+            SELECT category, details, contact, created
+            FROM orders
+            WHERE username=?
+            ORDER BY id DESC
+        """, (username,)).fetchall()
+
         con.close()
 
         if user:
@@ -642,6 +649,24 @@ elif page == "👤 حسابي":
             )
         else:
             st.info("لا توجد طلبات دفع حتى الآن.")
+
+        st.markdown("### طلبات التصميم الخاصة بي")
+        if orders:
+            st.dataframe(
+                [
+                    {
+                        "نوع الطلب": o["category"],
+                        "التفاصيل": o["details"],
+                        "وسيلة التواصل": o["contact"],
+                        "تاريخ الطلب": o["created"]
+                    }
+                    for o in orders
+                ],
+                use_container_width=True,
+                hide_index=True
+            )
+        else:
+            st.info("لم ترسل أي طلبات تصميم بعد.")
 
 
 # =====================================
