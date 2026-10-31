@@ -38,7 +38,19 @@ def rows_to_csv(rows):
     output = io.StringIO()
     writer = csv.DictWriter(output, fieldnames=list(rows[0].keys()))
     writer.writeheader()
-    writer.writerows([dict(row) for row in rows])
+
+    # منع تفسير القيم التي أدخلها المستخدم كمعادلات عند فتح CSV في برامج الجداول.
+    safe_rows = []
+    for row in rows:
+        safe_row = {}
+        for key, value in dict(row).items():
+            cell = "" if value is None else str(value)
+            if cell.lstrip().startswith(("=", "+", "-", "@")):
+                cell = "'" + cell
+            safe_row[key] = cell
+        safe_rows.append(safe_row)
+
+    writer.writerows(safe_rows)
     return output.getvalue().encode("utf-8-sig")
 
 
@@ -75,9 +87,19 @@ def setup_db():
             category TEXT NOT NULL,
             details TEXT NOT NULL,
             contact TEXT NOT NULL,
-            created TEXT NOT NULL
+            created TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'جديد'
         )
     """)
+
+    # ترقية قواعد البيانات القديمة دون حذف الطلبات السابقة.
+    order_columns = {
+        row["name"] for row in cur.execute("PRAGMA table_info(orders)").fetchall()
+    }
+    if "status" not in order_columns:
+        cur.execute(
+            "ALTER TABLE orders ADD COLUMN status TEXT NOT NULL DEFAULT 'جديد'"
+        )
 
     con.commit()
     con.close()
@@ -339,6 +361,7 @@ nav_left, nav_right = st.columns([5, 1])
 with nav_right:
     if username and st.button("تسجيل الخروج", key="top_logout"):
         st.session_state.pop("username", None)
+        st.session_state["admin_ok"] = False
         st.rerun()
 
 
@@ -697,7 +720,7 @@ elif page == "👤 حسابي":
         """, (username,)).fetchall()
 
         orders = con.execute("""
-            SELECT category, details, contact, created
+            SELECT category, details, contact, created, status
             FROM orders
             WHERE username=?
             ORDER BY id DESC
@@ -708,11 +731,14 @@ elif page == "👤 حسابي":
         if user:
             st.subheader("👤 حسابي")
 
+            safe_username = html.escape(str(user[0]))
+            safe_plan = html.escape(str(user[1]))
+            safe_created = html.escape(str(user[2]))
             st.markdown(f"""
             <div class="card">
-                <h3 class="gold">مرحبًا {user[0]}</h3>
-                <p>الخطة الحالية: {user[1]}</p>
-                <p>تاريخ التسجيل: {user[2]}</p>
+                <h3 class="gold">مرحبًا {safe_username}</h3>
+                <p>الخطة الحالية: {safe_plan}</p>
+                <p>تاريخ التسجيل: {safe_created}</p>
             </div>
             """, unsafe_allow_html=True)
 
@@ -734,7 +760,8 @@ elif page == "👤 حسابي":
                         "نوع الطلب": o["category"],
                         "التفاصيل": o["details"],
                         "وسيلة التواصل": o["contact"],
-                        "تاريخ الطلب": o["created"]
+                        "تاريخ الطلب": o["created"],
+                        "حالة الطلب": o["status"]
                     }
                     for o in orders
                 ],
@@ -920,6 +947,33 @@ elif page == "🛡️ الإدارة":
                 st.info("لا توجد طلبات دفع.")
 
             con.close()
+
+            st.markdown("### تحديث حالة طلب التصميم")
+            if orders:
+                order_options = {
+                    f'طلب #{o["id"]} — {o["username"]} — {o["category"]}': o["id"]
+                    for o in orders
+                }
+                selected_order_label = st.selectbox(
+                    "اختر طلب التصميم",
+                    list(order_options.keys())
+                )
+                order_status = st.selectbox(
+                    "حالة طلب التصميم",
+                    ["جديد", "قيد التنفيذ", "بانتظار مراجعة العميل", "مكتمل", "مرفوض"]
+                )
+                if st.button("حفظ حالة التصميم"):
+                    con = connect_db()
+                    con.execute(
+                        "UPDATE orders SET status=? WHERE id=?",
+                        (order_status, order_options[selected_order_label])
+                    )
+                    con.commit()
+                    con.close()
+                    st.success("تم تحديث حالة طلب التصميم.")
+                    st.rerun()
+            else:
+                st.info("لا توجد طلبات لتحديث حالتها.")
 
             st.markdown("### مراجعة الدفع")
 
