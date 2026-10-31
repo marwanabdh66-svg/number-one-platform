@@ -6,6 +6,7 @@ import html
 import csv
 import io
 from datetime import datetime
+from template_catalog import TEMPLATE_CATALOG, render_preview_data_uri
 
 # =====================================
 # NUMBER ONE - AI AD STUDIO
@@ -469,6 +470,9 @@ if username:
         unsafe_allow_html=True
     )
 
+if st.session_state.pop("template_navigation_pending", False):
+    st.session_state["main_navigation"] = "🤖 صانع الإعلان"
+
 page = st.radio(
     "التنقل الرئيسي",
     pages,
@@ -541,58 +545,150 @@ if page == "🏠 الرئيسية":
 
 elif page == "🎨 قوالب الإعلانات":
 
-    st.subheader("🎨 مكتبة القوالب والأفكار")
-
-    templates = {
-        "🍔 المطاعم": [
-            "إعلان برغر سينمائي",
-            "عرض وجبة عائلية",
-            "إعلان قهوة فاخر",
-            "إعلان افتتاح مطعم"
-        ],
-        "🏠 العقارات": [
-            "إعلان شقة للبيع",
-            "إعلان فيلا فاخرة",
-            "إعلان أرض استثمارية",
-            "إعلان مشروع سكني"
-        ],
-        "🛍️ المتاجر": [
-            "إعلان تخفيضات",
-            "إعلان منتج جديد",
-            "إعلان متجر إلكتروني",
-            "إعلان ملابس"
-        ],
-        "💈 الخدمات": [
-            "إعلان صالون",
-            "إعلان مركز تجميل",
-            "إعلان صيانة",
-            "إعلان مركز تعليمي"
-        ],
-        "💻 التقنية": [
-            "إعلان تطبيق",
-            "إعلان متجر إلكترونيات",
-            "إعلان خدمة رقمية",
-            "إعلان دورة تدريبية"
-        ]
-    }
-
-    category = st.selectbox("اختر المجال", list(templates.keys()))
-
-    template = st.selectbox(
-        "اختر القالب",
-        templates[category]
+    st.subheader("🎨 مكتبة قوالب NUMBER ONE")
+    st.caption(
+        "تضم المكتبة 400 صيغة بداية موزعة على 10 مجالات و5 مقاسات. "
+        "المعاينات رسومات SVG أصلية تُنشأ داخل المنصة، وليست ملفات PSD أو Canva متعددة الطبقات."
     )
 
-    st.markdown(f"""
-    <div class="card">
-        <h3 class="gold">{template}</h3>
-        <p>طوّر هذه الفكرة لتناسب مشروعك وعملاءك.</p>
-    </div>
-    """, unsafe_allow_html=True)
+    filter_col1, filter_col2, filter_col3 = st.columns([2, 1, 1])
+    with filter_col1:
+        search_query = st.text_input(
+            "ابحث باسم القالب أو المجال أو المقاس",
+            placeholder="مثال: قهوة، عقارات، قصة عمودية...",
+            key="template_search"
+        )
+    with filter_col2:
+        category_options = ["كل المجالات"] + sorted(
+            {item["category"] for item in TEMPLATE_CATALOG}
+        )
+        selected_category = st.selectbox(
+            "المجال",
+            category_options,
+            key="template_category_filter"
+        )
+    with filter_col3:
+        format_options = ["كل المقاسات"] + sorted(
+            {item["format"] for item in TEMPLATE_CATALOG}
+        )
+        selected_format = st.selectbox(
+            "المقاس",
+            format_options,
+            key="template_format_filter"
+        )
 
-    if st.button("استخدام القالب"):
-        st.session_state["template"] = template
-        st.success("تم الاختيار. انتقل إلى صانع الإعلان.")
+    normalized_query = search_query.strip().casefold()
+    filtered_templates = [
+        item for item in TEMPLATE_CATALOG
+        if (
+            selected_category == "كل المجالات"
+            or item["category"] == selected_category
+        )
+        and (
+            selected_format == "كل المقاسات"
+            or item["format"] == selected_format
+        )
+        and (
+            not normalized_query
+            or normalized_query in " ".join(
+                [
+                    item["title"],
+                    item["category"],
+                    item["topic"],
+                    item["format"],
+                    item["style"],
+                ]
+            ).casefold()
+        )
+    ]
+
+    metric_a, metric_b, metric_c = st.columns(3)
+    metric_a.metric("إجمالي الصيغ", f"{len(TEMPLATE_CATALOG):,}")
+    metric_b.metric("نتائج البحث", f"{len(filtered_templates):,}")
+    metric_c.metric("المجالات", len(category_options) - 1)
+
+    if not filtered_templates:
+        st.warning("لم نعثر على قالب يطابق البحث. جرّب كلمة أخرى أو غيّر المجال.")
+    else:
+        page_size = st.selectbox(
+            "عدد القوالب في الصفحة",
+            [6, 9, 12],
+            index=1,
+            key="template_page_size"
+        )
+        total_pages = max(
+            1,
+            (len(filtered_templates) + page_size - 1) // page_size
+        )
+        page_options = list(range(1, total_pages + 1))
+        page_number = st.selectbox(
+            f"صفحة النتائج (من {total_pages})",
+            page_options,
+            key=f"template_page_{len(filtered_templates)}_{page_size}"
+        )
+
+        first_item = (page_number - 1) * page_size
+        visible_templates = filtered_templates[first_item:first_item + page_size]
+        st.caption(
+            f"عرض {first_item + 1}–{first_item + len(visible_templates)} "
+            f"من أصل {len(filtered_templates)} نتيجة."
+        )
+
+        preview_columns = st.columns(3)
+        for index, item in enumerate(visible_templates):
+            with preview_columns[index % 3]:
+                preview_uri = render_preview_data_uri(item)
+                safe_title = html.escape(item["title"])
+                safe_category = html.escape(item["category"])
+                safe_format = html.escape(item["format"])
+                safe_style = html.escape(item["style"])
+                st.markdown(
+                    f"""
+                    <div class="card" style="padding:10px;min-height:0">
+                        <img
+                            src="{preview_uri}"
+                            alt="{safe_title}"
+                            loading="lazy"
+                            style="display:block;width:100%;height:auto;border-radius:12px"
+                        >
+                        <div style="padding:10px 4px 2px">
+                            <div style="color:#f0cc70;font-size:12px">{safe_category}</div>
+                            <h4 style="margin:5px 0;color:#ffffff">{safe_title}</h4>
+                            <div style="color:#c7d2e5;font-size:12px">
+                                {safe_format} · {safe_style}
+                            </div>
+                            <div style="color:#8fa2bf;font-size:11px;margin-top:7px">
+                                {item["id"]} · معاينة SVG أصلية
+                            </div>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+                if st.button(
+                    "استخدام هذا القالب",
+                    key=f"use_template_{item['id']}",
+                    use_container_width=True
+                ):
+                    st.session_state["template"] = item["title"]
+                    st.session_state["selected_template_id"] = item["id"]
+                    st.session_state["ad_details_input"] = (
+                        f"القالب المختار: {item['title']}\n"
+                        f"المجال: {item['category']}\n"
+                        f"المقاس: {item['format']}\n"
+                        f"الأسلوب: {item['style']}\n"
+                        f"فكرة التصميم: {item['description']}\n"
+                        "أضف اسم مشروعك والسعر والتفاصيل التي تريد ظهورها في الإعلان."
+                    )
+                    st.session_state["template_selected_notice"] = item["title"]
+                    st.session_state["template_navigation_pending"] = True
+                    st.rerun()
+
+    st.caption(
+        "ملاحظة: هذه معاينات تصميمية أصلية خفيفة؛ لا تمثل بعد ملفات تصميم مفتوحة الطبقات. "
+        "سيتم توسيع مكتبة الصور والفيديو في خطوة مستقلة."
+    )
 
 
 # =====================================
@@ -602,6 +698,10 @@ elif page == "🎨 قوالب الإعلانات":
 elif page == "🤖 صانع الإعلان":
 
     st.subheader("🤖 صانع وصف الإعلان")
+
+    selected_notice = st.session_state.pop("template_selected_notice", None)
+    if selected_notice:
+        st.success(f"تم تحميل القالب «{selected_notice}» في نموذج الإعلان. أكمل بيانات مشروعك.")
 
     business = st.text_input(
         "اسم المشروع",
@@ -632,8 +732,8 @@ elif page == "🤖 صانع الإعلان":
 
     details = st.text_area(
         "تفاصيل المنتج أو العرض",
-        value=st.session_state.get("template", ""),
-        placeholder="اكتب السعر والخصومات ومميزات المنتج..."
+        placeholder="اكتب السعر والخصومات ومميزات المنتج...",
+        key="ad_details_input"
     )
 
     if st.button("✨ إنشاء وصف الإعلان"):
