@@ -7,6 +7,7 @@ import csv
 import io
 from datetime import datetime
 from template_catalog import TEMPLATE_CATALOG, render_preview_data_uri
+from project_store import initialize_projects_table, save_project, list_projects
 
 # =====================================
 # NUMBER ONE - AI AD STUDIO
@@ -92,6 +93,9 @@ def setup_db():
             status TEXT NOT NULL DEFAULT 'جديد'
         )
     """)
+
+    # إنشاء جدول المشاريع دون المساس بجداول المستخدمين أو المدفوعات أو الطلبات.
+    initialize_projects_table(con)
 
     # ترقية قواعد البيانات القديمة دون حذف الطلبات السابقة.
     order_columns = {
@@ -780,6 +784,42 @@ Avoid spelling mistakes and unnecessary visual clutter.
             mime="text/plain"
         )
 
+        st.markdown("### 💾 حفظ المشروع")
+        st.caption("يُحفظ وصف الإعلان والقالب المرتبط به داخل حسابك؛ حفظ ملف تصميم متعدد الطبقات غير متاح بعد.")
+        st.text_input(
+            "اسم المشروع المحفوظ",
+            placeholder="مثال: إعلان افتتاح المطعم",
+            key="project_title_input"
+        )
+
+        if st.button("💾 حفظ المشروع في حسابي", key="save_ad_project"):
+            if not username:
+                st.warning("سجّل الدخول أولًا حتى يُحفظ المشروع في حسابك.")
+            else:
+                project_title = st.session_state.get("project_title_input", "").strip()
+                if not project_title:
+                    project_title = (
+                        f"مشروع {business.strip()}"
+                        if business.strip()
+                        else "مشروع إعلاني"
+                    )
+
+                con = connect_db()
+                try:
+                    project_id = save_project(
+                        con,
+                        username=username,
+                        title=project_title,
+                        prompt=st.session_state["prompt"],
+                        template_id=st.session_state.get("selected_template_id")
+                    )
+                except (sqlite3.Error, ValueError):
+                    st.error("تعذر حفظ المشروع. تحقق من تسجيل الدخول وحاول مرة أخرى.")
+                else:
+                    st.success(f"تم حفظ المشروع رقم {project_id} في حسابك.")
+                finally:
+                    con.close()
+
 
 # =====================================
 # طلب تصميم
@@ -941,6 +981,8 @@ elif page == "👤 حسابي":
             ORDER BY id DESC
         """, (username,)).fetchall()
 
+        projects = list_projects(con, username)
+
         con.close()
 
         if user:
@@ -956,6 +998,30 @@ elif page == "👤 حسابي":
                 <p>تاريخ التسجيل: {safe_created}</p>
             </div>
             """, unsafe_allow_html=True)
+
+        st.markdown("### 💾 مشاريعي المحفوظة")
+        if projects:
+            for project in projects:
+                with st.expander(
+                    f"#{project['id']} · {project['title']} · {project['created']}"
+                ):
+                    if project["template_id"]:
+                        st.caption(f"القالب المرتبط: {project['template_id']}")
+                    st.text_area(
+                        "وصف المشروع",
+                        value=project["prompt"],
+                        height=180,
+                        key=f"saved_project_prompt_{project['id']}"
+                    )
+                    st.download_button(
+                        "تنزيل وصف المشروع",
+                        data=project["prompt"],
+                        file_name=f"number_one_project_{project['id']}.txt",
+                        mime="text/plain",
+                        key=f"download_saved_project_{project['id']}"
+                    )
+        else:
+            st.info("لا توجد مشاريع محفوظة بعد. أنشئ وصف إعلان ثم احفظه من صانع الإعلان.")
 
         st.markdown("### طلبات الدفع السابقة")
 
