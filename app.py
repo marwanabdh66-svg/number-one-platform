@@ -300,6 +300,126 @@ div.stButton > button:hover {
 hr {
     border-color: #344663;
 }
+
+/* واجهة سطح المكتب الاحترافية */
+@media (min-width: 1100px) {
+    .block-container {
+        max-width: 1680px;
+        padding: 2.1rem 3.2rem 4rem;
+    }
+    .top-brand {
+        min-height: 112px;
+        padding: 24px 34px;
+        border-radius: 24px;
+        margin-bottom: 24px;
+    }
+    .brand-mark { font-size: 48px; }
+    .brand-name { font-size: 32px; letter-spacing: 2px; }
+    .brand-caption { font-size: 14px; }
+    .brand-status { font-size: 14px; }
+    .welcome-strip {
+        padding: 15px 22px;
+        margin-bottom: 18px;
+        font-size: 15px;
+    }
+    div[role="radiogroup"] {
+        display: grid !important;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 10px;
+        padding: 14px;
+        margin-bottom: 30px;
+        border-radius: 20px;
+    }
+    div[role="radiogroup"] label {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 52px;
+        padding: 10px 14px;
+        border-radius: 13px;
+        transition: all .2s ease;
+        text-align: center;
+    }
+    div[role="radiogroup"] label:hover {
+        border-color: #d7b45d;
+        background: #243958;
+        transform: translateY(-2px);
+    }
+    div[role="radiogroup"] label p {
+        font-size: 14px;
+        font-weight: 700;
+        margin: 0;
+    }
+    .hero {
+        padding: 52px 36px;
+        border-radius: 28px;
+        margin-bottom: 34px;
+    }
+    .hero h1 { font-size: 52px; }
+    .hero p { font-size: 19px; }
+    .card {
+        padding: 28px;
+        border-radius: 22px;
+        min-height: 150px;
+        box-shadow: 0 14px 34px rgba(0,0,0,.16);
+        transition: transform .2s ease, border-color .2s ease;
+    }
+    .card:hover {
+        transform: translateY(-4px);
+        border-color: rgba(240,204,112,.75);
+    }
+    h1 { font-size: 2.25rem !important; }
+    h2 { font-size: 1.8rem !important; }
+    h3 { font-size: 1.3rem !important; }
+    p, li, label, .stMarkdown { line-height: 1.85; }
+    div.stButton > button, .stDownloadButton > button,
+    div[data-testid="stFormSubmitButton"] > button {
+        min-height: 50px;
+        border-radius: 13px;
+        font-size: 15px;
+    }
+    .stTextInput input, .stTextArea textarea,
+    div[data-baseweb="select"] > div {
+        min-height: 48px;
+        border-radius: 12px;
+    }
+    [data-testid="stMetric"] {
+        background: linear-gradient(145deg, #192a45, #101a2d);
+        border: 1px solid #344663;
+        border-radius: 18px;
+        padding: 20px 22px;
+    }
+    [data-testid="stDataFrame"] {
+        border: 1px solid #344663;
+        border-radius: 14px;
+        overflow: hidden;
+    }
+}
+/* توازن العرض على الأجهزة المتوسطة والهواتف */
+@media (max-width: 1099px) {
+    .block-container {
+        padding-left: 1.2rem;
+        padding-right: 1.2rem;
+    }
+    div[role="radiogroup"] {
+        display: flex;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        white-space: nowrap;
+        scrollbar-width: thin;
+    }
+    div[role="radiogroup"] label { flex: 0 0 auto; }
+}
+@media (max-width: 640px) {
+    .top-brand { padding: 14px; gap: 9px; }
+    .brand-mark { font-size: 27px; }
+    .brand-name { font-size: 20px; }
+    .brand-caption { font-size: 10px; }
+    .brand-status { display: none; }
+    .hero h1 { font-size: 29px; }
+    .card { padding: 16px; }
+}
+
 </style>
 """, unsafe_allow_html=True)
 
