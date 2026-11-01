@@ -60,7 +60,6 @@ jobs:
           assert preview.startswith("<svg")
           assert "NUMBER ONE" in preview
           print("PASS: 400 unique catalog entries and SVG preview generation.")
-
+          PY
       - name: اختبار مكتبة الوسائط وفحص التراخيص
         run: python -m unittest discover -s tests -v
-          PY
