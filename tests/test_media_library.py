@@ -52,6 +52,13 @@ class MediaLibraryNormalizationTests(unittest.TestCase):
             [],
         )
 
+    def test_restrictions_override_an_otherwise_allowed_license(self):
+        restricted = self.make_page()
+        restricted["imageinfo"][0]["extmetadata"]["Restrictions"] = {
+            "value": "Non-commercial use only"
+        }
+        self.assertEqual(normalize_media_pages([restricted], "image"), [])
+
     def test_unknown_license_is_excluded(self):
         page = self.make_page(license_name="Unknown", license_url="")
         self.assertEqual(normalize_media_pages([page], "image"), [])
