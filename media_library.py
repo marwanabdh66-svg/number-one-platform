@@ -30,7 +30,7 @@ def _clean_text(value: object) -> str:
         value = value.get("value", "")
     text = html.unescape(str(value or ""))
     text = re.sub(r"<[^>]*>", " ", text)
-    return re.sub(r"\\s+", " ", text).strip()
+    return re.sub(r"\s+", " ", text).strip()
 
 
 def _metadata_value(metadata: dict, key: str) -> str:
@@ -47,7 +47,7 @@ def _license_details(metadata: dict) -> tuple[str, str, str] | None:
 
     # Exclude licenses that prohibit commercial use or derivative adaptations.
     restricted = re.search(
-        r"\\bNC\\b|\\bND\\b|non[ -]?commercial|no[ -]?derivatives?|fair use|all rights reserved",
+        r"\bNC\b|\bND\b|non[ -]?commercial|no[ -]?derivatives?|fair use|all rights reserved",
         combined,
         flags=re.IGNORECASE,
     )
@@ -72,7 +72,7 @@ def _license_details(metadata: dict) -> tuple[str, str, str] | None:
 
     if (
         "creativecommons.org/licenses/by/" in license_url.casefold()
-        or re.search(r"\\bcc[ -]?by(?:\\s|$)", license_name.casefold())
+        or re.search(r"\bcc[ -]?by(?:\s|$)", license_name.casefold())
     ):
         return (
             license_name or "CC BY",
