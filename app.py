@@ -8,6 +8,7 @@ import io
 from datetime import datetime
 from template_catalog import TEMPLATE_CATALOG, render_preview_data_uri
 from project_store import initialize_projects_table, save_project, list_projects
+from media_library import MediaLibraryError, search_commons_media
 
 # =====================================
 # NUMBER ONE - AI AD STUDIO
@@ -20,6 +21,13 @@ st.set_page_config(
 )
 
 DB = "number_one.db"
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def cached_commons_search(query, media_type, limit):
+    """Cache Commons searches for one hour to reduce external requests."""
+    return search_commons_media(query, media_type=media_type, limit=limit)
+
 
 
 # =====================================
@@ -442,6 +450,7 @@ username = st.session_state.get("username")
 pages = [
     "🏠 الرئيسية",
     "🎨 قوالب الإعلانات",
+    "🖼️ مكتبة الوسائط",
     "🤖 صانع الإعلان",
     "🎬 طلب تصميم",
     "💎 الاشتراكات",
@@ -692,6 +701,130 @@ elif page == "🎨 قوالب الإعلانات":
     st.caption(
         "ملاحظة: هذه معاينات تصميمية أصلية خفيفة؛ لا تمثل بعد ملفات تصميم مفتوحة الطبقات. "
         "سيتم توسيع مكتبة الصور والفيديو في خطوة مستقلة."
+    )
+
+
+# =====================================
+# مكتبة الصور والفيديوهات المرخصة
+# =====================================
+
+elif page == "🖼️ مكتبة الوسائط":
+
+    st.subheader("🖼️ مكتبة الصور والفيديوهات")
+    st.caption(
+        "بحث مباشر في ملفات ويكيميديا كومنز. نعرض فقط الملفات التي تحمل ترخيصًا واضحًا "
+        "يسمح مبدئيًا بالاستخدام التجاري، مع إظهار صفحة المصدر وشروط الترخيص."
+    )
+
+    search_col, type_col = st.columns([3, 1])
+    with search_col:
+        media_query = st.text_input(
+            "ابحث عن صورة أو فيديو",
+            placeholder="مثال: قهوة، طبيعة، هاتف، مطعم...",
+            key="commons_media_query_input",
+        )
+    with type_col:
+        media_type_label = st.selectbox(
+            "نوع الوسائط",
+            ["صور", "فيديوهات"],
+            key="commons_media_type_input",
+        )
+
+    selected_media_type = "image" if media_type_label == "صور" else "video"
+    if st.button("🔎 البحث في مكتبة الوسائط", key="commons_media_search_button"):
+        st.session_state.pop("commons_media_results", None)
+        if len(media_query.strip()) < 2:
+            st.warning("اكتب حرفين على الأقل للبحث.")
+        else:
+            result_limit = 8 if selected_media_type == "image" else 4
+            try:
+                with st.spinner("جارٍ البحث عن ملفات مرخصة..."):
+                    found_media = cached_commons_search(
+                        media_query.strip(),
+                        selected_media_type,
+                        result_limit,
+                    )
+                st.session_state["commons_media_results"] = found_media
+                st.session_state["commons_media_results_type"] = selected_media_type
+                st.session_state["commons_media_results_query"] = media_query.strip()
+            except ValueError as exc:
+                st.warning(str(exc))
+            except MediaLibraryError as exc:
+                st.error(str(exc))
+
+    media_results = st.session_state.get("commons_media_results", [])
+    saved_media_type = st.session_state.get("commons_media_results_type")
+    if saved_media_type == selected_media_type:
+        st.caption(
+            f"نتائج البحث عن «{html.escape(str(st.session_state.get('commons_media_results_query', '')))}» "
+            f"— {len(media_results)} ملفًا اجتاز فحص الترخيص."
+        )
+        if not media_results:
+            st.info(
+                "لا توجد نتائج مطابقة بترخيص واضح في هذه الصفحة. جرّب كلمة أخرى؛ "
+                "ولا نعرض الملفات ذات الترخيص المجهول أو غير التجاري أو التي تمنع التعديل."
+            )
+        else:
+            media_columns = st.columns(2)
+            for index, asset in enumerate(media_results):
+                with media_columns[index % 2]:
+                    safe_title = html.escape(asset["title"])
+                    safe_license = html.escape(asset["license_name"])
+                    safe_artist = html.escape(asset["artist"] or asset["credit"] or "غير مذكور في بيانات الملف")
+                    if asset["media_type"] == "image":
+                        st.image(
+                            asset["preview_url"],
+                            caption=asset["title"],
+                            use_container_width=True,
+                        )
+                    else:
+                        if asset["preview_url"] and asset["preview_url"] != asset["media_url"]:
+                            st.image(
+                                asset["preview_url"],
+                                caption=f"معاينة: {asset['title']}",
+                                use_container_width=True,
+                            )
+                        if asset["mime"] in {"video/webm", "video/mp4", "video/ogg"}:
+                            st.video(
+                                asset["media_url"],
+                                format=asset["mime"],
+                                autoplay=False,
+                                muted=True,
+                            )
+                        else:
+                            st.info("صيغة الفيديو قد لا تعمل داخل المتصفح؛ افتح الملف من صفحة المصدر.")
+
+                    st.markdown(f"**{safe_title}**")
+                    st.caption(f"الترخيص: {safe_license} · المؤلف/المصدر: {safe_artist}")
+                    st.info(asset["license_notice"])
+                    link_col1, link_col2 = st.columns(2)
+                    with link_col1:
+                        st.link_button(
+                            "صفحة الملف والمصدر",
+                            asset["page_url"],
+                            use_container_width=True,
+                        )
+                    with link_col2:
+                        if asset["license_url"]:
+                            st.link_button(
+                                "نص الترخيص",
+                                asset["license_url"],
+                                use_container_width=True,
+                            )
+                    if asset["attribution_required"]:
+                        attribution = (
+                            f"المؤلف: {asset['artist'] or asset['credit'] or asset['title']}\n"
+                            f"الترخيص: {asset['license_name']}\n"
+                            f"المصدر: {asset['page_url']}"
+                        )
+                        st.code(attribution, language=None)
+    elif media_results:
+        st.caption("غيّرت نوع الوسائط؛ اضغط زر البحث لعرض نتائج النوع الجديد.")
+
+    st.warning(
+        "تنبيه: الترخيص لا يلغي حقوق العلامات التجارية أو الخصوصية أو حقوق الأشخاص الظاهرين. "
+        "افتح صفحة كل ملف وراجع شروطه قبل استخدامه في إعلان تجاري. "
+        "ملفات CC BY-SA تتطلب مراعاة شرط المشاركة بالمثل عند إعداد عمل مشتق."
     )
 
 
