@@ -21,7 +21,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       - name: فحص صياغة ملفات Python
-        run: python -m py_compile app.py template_catalog.py project_store.py
+        run: python -m py_compile app.py template_catalog.py project_store.py media_library.py tests/test_media_library.py
       - name: اختبار حفظ المشاريع وعزل بيانات المستخدمين
         run: |
           python - <<'PY'
@@ -60,4 +60,7 @@ jobs:
           assert preview.startswith("<svg")
           assert "NUMBER ONE" in preview
           print("PASS: 400 unique catalog entries and SVG preview generation.")
+
+      - name: اختبار مكتبة الوسائط وفحص التراخيص
+        run: python -m unittest discover -s tests -v
           PY
