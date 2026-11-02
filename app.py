@@ -5,6 +5,7 @@ import secrets
 import html
 import csv
 import io
+import json
 from datetime import datetime
 from template_catalog import TEMPLATE_CATALOG, render_preview_data_uri
 from project_store import initialize_projects_table, save_project, list_projects
@@ -818,8 +819,34 @@ elif page == "🖼️ مكتبة الوسائط":
                             f"المصدر: {asset['page_url']}"
                         )
                         st.code(attribution, language=None)
+
+                    if st.button(
+                        "➕ إضافة هذا الوسيط إلى مشروعي",
+                        key=f"attach_media_{selected_media_type}_{index}",
+                        use_container_width=True,
+                    ):
+                        st.session_state["selected_media_asset"] = {
+                            field: asset.get(field)
+                            for field in (
+                                "title", "media_type", "mime", "media_url",
+                                "preview_url", "page_url", "license_name",
+                                "license_url", "license_notice", "artist",
+                                "credit", "description", "attribution_required",
+                            )
+                        }
+                        st.success("تم اختيار الوسيط. انتقل إلى صانع الإعلان لإرفاقه بالمشروع.")
     elif media_results:
         st.caption("غيّرت نوع الوسائط؛ اضغط زر البحث لعرض نتائج النوع الجديد.")
+
+    selected_asset = st.session_state.get("selected_media_asset")
+    if selected_asset:
+        st.markdown("### الوسيط المحدد لمشروعك")
+        st.write(selected_asset.get("title", "وسيط محدد"))
+        st.caption(
+            f"النوع: {selected_asset.get('media_type', '')} · "
+            f"الترخيص: {selected_asset.get('license_name', '')}"
+        )
+        st.link_button("فتح صفحة المصدر", selected_asset["page_url"])
 
     st.warning(
         "تنبيه: الترخيص لا يلغي حقوق العلامات التجارية أو الخصوصية أو حقوق الأشخاص الظاهرين. "
@@ -839,6 +866,19 @@ elif page == "🤖 صانع الإعلان":
     selected_notice = st.session_state.pop("template_selected_notice", None)
     if selected_notice:
         st.success(f"تم تحميل القالب «{selected_notice}» في نموذج الإعلان. أكمل بيانات مشروعك.")
+
+    selected_media_asset = st.session_state.get("selected_media_asset")
+    if selected_media_asset:
+        st.markdown("### 🖼️ الوسيط المرفق بالمشروع")
+        st.write(selected_media_asset.get("title", "وسيط محدد"))
+        st.caption(
+            f"{selected_media_asset.get('media_type', '')} · "
+            f"{selected_media_asset.get('license_name', '')}"
+        )
+        st.link_button("صفحة الملف والترخيص", selected_media_asset["page_url"])
+        if st.button("إزالة الوسيط من المشروع", key="remove_selected_media"):
+            st.session_state.pop("selected_media_asset", None)
+            st.rerun()
 
     business = st.text_input(
         "اسم المشروع",
@@ -944,7 +984,8 @@ Avoid spelling mistakes and unnecessary visual clutter.
                         username=username,
                         title=project_title,
                         prompt=st.session_state["prompt"],
-                        template_id=st.session_state.get("selected_template_id")
+                        template_id=st.session_state.get("selected_template_id"),
+                        media=st.session_state.get("selected_media_asset"),
                     )
                 except (sqlite3.Error, ValueError):
                     st.error("تعذر حفظ المشروع. تحقق من تسجيل الدخول وحاول مرة أخرى.")
@@ -1140,6 +1181,38 @@ elif page == "👤 حسابي":
                 ):
                     if project["template_id"]:
                         st.caption(f"القالب المرتبط: {project['template_id']}")
+
+                    saved_media = None
+                    if project["media_json"]:
+                        try:
+                            saved_media = json.loads(project["media_json"])
+                        except (TypeError, ValueError):
+                            st.warning("تعذر قراءة بيانات الوسيط المحفوظ لهذا المشروع.")
+
+                    if saved_media:
+                        st.markdown("#### الوسيط والترخيص المحفوظان")
+                        st.caption(
+                            f"{saved_media.get('title', 'وسيط')} · "
+                            f"{saved_media.get('license_name', 'ترخيص غير محدد')}"
+                        )
+                        if saved_media.get("media_type") == "image" and saved_media.get("preview_url"):
+                            st.image(saved_media["preview_url"], use_container_width=True)
+                        elif saved_media.get("media_type") == "video":
+                            if saved_media.get("mime") in {"video/webm", "video/mp4", "video/ogg"}:
+                                st.video(saved_media["media_url"], format=saved_media["mime"], autoplay=False, muted=True)
+                            else:
+                                st.info("صيغة الفيديو غير مدعومة للعرض المباشر؛ استخدم صفحة المصدر.")
+                        st.link_button("صفحة ملف الوسائط", saved_media["page_url"])
+                        if saved_media.get("license_url"):
+                            st.link_button("شروط الترخيص", saved_media["license_url"])
+                        if saved_media.get("attribution_required"):
+                            st.code(
+                                f"المؤلف: {saved_media.get('artist') or saved_media.get('credit') or saved_media.get('title')}\n"
+                                f"الترخيص: {saved_media.get('license_name')}\n"
+                                f"المصدر: {saved_media.get('page_url')}",
+                                language=None,
+                            )
+
                     st.text_area(
                         "وصف المشروع",
                         value=project["prompt"],
