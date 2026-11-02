@@ -51,6 +51,7 @@ class ProjectStoreMediaTests(unittest.TestCase):
         self.assertEqual(list_projects(self.connection, "user-b"), [])
 
     def test_old_projects_table_is_migrated_without_losing_rows(self):
+        self.connection.execute("DROP TABLE projects")
         self.connection.execute(
             """
             CREATE TABLE projects (
