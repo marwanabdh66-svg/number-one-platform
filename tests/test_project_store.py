@@ -102,6 +102,5 @@ class ProjectStoreMediaTests(unittest.TestCase):
             )
 
 
-if (require.main === module) {
-    // no-op: tests are run by Python unittest discovery
-}
+if __name__ == "__main__":
+    unittest.main()
