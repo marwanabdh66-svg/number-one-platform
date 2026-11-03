@@ -37,6 +37,30 @@ def _metadata_value(metadata: dict, key: str) -> str:
     return _clean_text(metadata.get(key, ""))
 
 
+def _requires_attribution(metadata: dict, license_name: str, license_url: str) -> bool:
+    """Recognize attribution obligations from canonical license URLs and labels."""
+    name = str(license_name or "").casefold()
+    url = str(license_url or "").casefold()
+
+    # Public-domain/CC0 assets do not require Creative Commons attribution.
+    if "cc0" in name or "public domain" in name or "/publicdomain/" in url:
+        return False
+
+    # Canonical CC BY and CC BY-SA URLs always require attribution.
+    if "/licenses/by/" in url or "/licenses/by-sa/" in url:
+        return True
+
+    # Commons may provide a long display label instead of the short "CC BY" form.
+    if (
+        re.search(r"\bcc[ -]?by(?:-sa)?(?:\s|$|[-\d])", name)
+        or "creative commons attribution" in name
+    ):
+        return True
+
+    explicit_flag = _metadata_value(metadata, "AttributionRequired").casefold()
+    return explicit_flag in {"true", "yes", "1", "required"}
+
+
 def _license_details(metadata: dict) -> tuple[str, str, str] | None:
     """Return (label, license URL, notice), or None for unsafe/unknown terms."""
     license_name = _metadata_value(metadata, "LicenseShortName")
@@ -116,7 +140,7 @@ def normalize_media_pages(pages: list[dict], media_type: str) -> list[dict]:
         artist = _metadata_value(metadata, "Artist")
         credit = _metadata_value(metadata, "Credit")
         description = _metadata_value(metadata, "ImageDescription")
-        attribution_required = license_name.casefold().startswith("cc by")
+        attribution_required = _requires_attribution(metadata, license_name, license_url)
         results.append(
             {
                 "title": title or "ملف وسائط من ويكيميديا",
