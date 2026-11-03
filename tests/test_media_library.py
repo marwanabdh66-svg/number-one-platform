@@ -38,6 +38,25 @@ class MediaLibraryNormalizationTests(unittest.TestCase):
             "https://commons.wikimedia.org/wiki/File:Sample_media.jpg",
         )
 
+    def test_long_creative_commons_attribution_label_requires_attribution(self):
+        page = self.make_page(
+            license_name="Creative Commons Attribution 4.0 International",
+            license_url="https://creativecommons.org/licenses/by/4.0/",
+        )
+        results = normalize_media_pages([page], "image")
+        self.assertEqual(len(results), 1)
+        self.assertTrue(results[0]["attribution_required"])
+
+    def test_cc_by_sa_requires_attribution(self):
+        page = self.make_page(
+            license_name="CC BY-SA 4.0",
+            license_url="https://creativecommons.org/licenses/by-sa/4.0/",
+        )
+        results = normalize_media_pages([page], "image")
+        self.assertEqual(len(results), 1)
+        self.assertTrue(results[0]["attribution_required"])
+        self.assertIn("المشاركة بالمثل", results[0]["license_notice"])
+
     def test_noncommercial_and_no_derivatives_are_excluded(self):
         noncommercial = self.make_page(
             license_name="CC BY-NC 4.0",
@@ -72,6 +91,7 @@ class MediaLibraryNormalizationTests(unittest.TestCase):
         results = normalize_media_pages([page], "video")
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0]["mime"], "video/webm")
+        self.assertFalse(results[0]["attribution_required"])
         self.assertEqual(
             results[0]["media_url"],
             "https://upload.wikimedia.org/sample-media",
