@@ -59,6 +59,33 @@ def _serialize_media_asset(media):
     return payload
 
 
+def format_media_attribution(media):
+    """Build a reusable attribution block from saved media/license metadata."""
+    if not isinstance(media, dict):
+        return "بيانات الإسناد غير متاحة."
+
+    author = str(
+        media.get("artist") or media.get("credit") or media.get("title") or "غير مذكور"
+    ).strip()
+    license_name = str(media.get("license_name") or "ترخيص غير محدد").strip()
+    source_url = str(media.get("page_url") or "غير متاح").strip()
+    lines = [
+        f"المؤلف: {author}",
+        f"الترخيص: {license_name}",
+        f"المصدر: {source_url}",
+    ]
+
+    license_url = str(media.get("license_url") or "").strip()
+    if license_url:
+        lines.append(f"رابط الترخيص: {license_url}")
+
+    license_notice = str(media.get("license_notice") or "").strip()
+    if license_notice:
+        lines.append(f"ملاحظة الترخيص: {license_notice}")
+
+    return "\n".join(lines)
+
+
 def initialize_projects_table(connection):
     """Create the saved-projects table and safely migrate older local databases."""
     connection.execute(
