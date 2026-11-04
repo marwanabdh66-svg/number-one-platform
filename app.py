@@ -8,7 +8,7 @@ import io
 import json
 from datetime import datetime
 from template_catalog import TEMPLATE_CATALOG, render_preview_data_uri
-from project_store import initialize_projects_table, save_project, list_projects
+from project_store import initialize_projects_table, save_project, list_projects, format_media_attribution
 from media_library import MediaLibraryError, search_commons_media
 
 # =====================================
@@ -1207,9 +1207,7 @@ elif page == "👤 حسابي":
                             st.link_button("شروط الترخيص", saved_media["license_url"])
                         if saved_media.get("attribution_required"):
                             st.code(
-                                f"المؤلف: {saved_media.get('artist') or saved_media.get('credit') or saved_media.get('title')}\n"
-                                f"الترخيص: {saved_media.get('license_name')}\n"
-                                f"المصدر: {saved_media.get('page_url')}",
+                                format_media_attribution(saved_media),
                                 language=None,
                             )
 
