@@ -7,7 +7,7 @@ import csv
 import io
 import json
 from datetime import datetime
-from template_catalog import TEMPLATE_CATALOG, render_preview_data_uri
+from template_catalog import TEMPLATE_CATALOG, render_preview_data_uri, get_template_photo_preview
 from project_store import initialize_projects_table, save_project, list_projects, format_media_attribution
 from media_library import MediaLibraryError, search_commons_media
 
@@ -562,7 +562,8 @@ elif page == "🎨 قوالب الإعلانات":
     st.subheader("🎨 مكتبة قوالب NUMBER ONE")
     st.caption(
         "تضم المكتبة 400 صيغة بداية موزعة على 10 مجالات و5 مقاسات. "
-        "المعاينات رسومات SVG أصلية تُنشأ داخل المنصة، وليست ملفات PSD أو Canva متعددة الطبقات."
+        "أضيفت عينة من 4 صور فوتوغرافية مرخصة لبعض الموضوعات (20 صيغة مقاس)، "
+        "وتبقى بقية المعاينات SVG أصلية. ليست ملفات PSD أو Canva متعددة الطبقات."
     )
 
     filter_col1, filter_col2, filter_col3 = st.columns([2, 1, 1])
@@ -651,34 +652,71 @@ elif page == "🎨 قوالب الإعلانات":
         preview_columns = st.columns(3)
         for index, item in enumerate(visible_templates):
             with preview_columns[index % 3]:
-                preview_uri = render_preview_data_uri(item)
+                photo_preview = get_template_photo_preview(item)
                 safe_title = html.escape(item["title"])
                 safe_category = html.escape(item["category"])
                 safe_format = html.escape(item["format"])
                 safe_style = html.escape(item["style"])
-                st.markdown(
-                    f"""
-                    <div class="card" style="padding:10px;min-height:0">
-                        <img
-                            src="{preview_uri}"
-                            alt="{safe_title}"
-                            loading="lazy"
-                            style="display:block;width:100%;height:auto;border-radius:12px"
-                        >
-                        <div style="padding:10px 4px 2px">
-                            <div style="color:#f0cc70;font-size:12px">{safe_category}</div>
-                            <h4 style="margin:5px 0;color:#ffffff">{safe_title}</h4>
-                            <div style="color:#c7d2e5;font-size:12px">
-                                {safe_format} · {safe_style}
-                            </div>
-                            <div style="color:#8fa2bf;font-size:11px;margin-top:7px">
-                                {item["id"]} · معاينة SVG أصلية
+
+                if photo_preview:
+                    st.image(
+                        photo_preview["preview_url"],
+                        caption=f"معاينة فوتوغرافية: {photo_preview['title']}",
+                        use_container_width=True,
+                    )
+                    st.markdown(
+                        f"""
+                        <div class="card" style="padding:10px;min-height:0">
+                            <div style="padding:10px 4px 2px">
+                                <div style="color:#f0cc70;font-size:12px">{safe_category}</div>
+                                <h4 style="margin:5px 0;color:#ffffff">{safe_title}</h4>
+                                <div style="color:#c7d2e5;font-size:12px">
+                                    {safe_format} · {safe_style}
+                                </div>
+                                <div style="color:#8fa2bf;font-size:11px;margin-top:7px">
+                                    {item["id"]} · صورة فوتوغرافية من Wikimedia Commons
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                    st.caption(
+                        f"المؤلف: {photo_preview['artist']} · "
+                        f"الترخيص: {photo_preview['license_name']} — "
+                        f"{photo_preview['license_notice']}"
+                    )
+                    st.link_button(
+                        "صفحة المصدر والترخيص",
+                        photo_preview["page_url"],
+                        key=f"template_photo_source_{item['id']}",
+                        use_container_width=True,
+                    )
+                else:
+                    preview_uri = render_preview_data_uri(item)
+                    st.markdown(
+                        f"""
+                        <div class="card" style="padding:10px;min-height:0">
+                            <img
+                                src="{preview_uri}"
+                                alt="{safe_title}"
+                                loading="lazy"
+                                style="display:block;width:100%;height:auto;border-radius:12px"
+                            >
+                            <div style="padding:10px 4px 2px">
+                                <div style="color:#f0cc70;font-size:12px">{safe_category}</div>
+                                <h4 style="margin:5px 0;color:#ffffff">{safe_title}</h4>
+                                <div style="color:#c7d2e5;font-size:12px">
+                                    {safe_format} · {safe_style}
+                                </div>
+                                <div style="color:#8fa2bf;font-size:11px;margin-top:7px">
+                                    {item["id"]} · معاينة SVG أصلية
+                                </div>
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
 
                 if st.button(
                     "استخدام هذا القالب",
@@ -700,8 +738,8 @@ elif page == "🎨 قوالب الإعلانات":
                     st.rerun()
 
     st.caption(
-        "ملاحظة: هذه معاينات تصميمية أصلية خفيفة؛ لا تمثل بعد ملفات تصميم مفتوحة الطبقات. "
-        "سيتم توسيع مكتبة الصور والفيديو في خطوة مستقلة."
+        "الصور الفوتوغرافية المعروضة عينة خارجية من Wikimedia Commons مع رابط المصدر والترخيص. "
+        "بقية القوالب تستخدم معاينات SVG أصلية، ولا يتوفر بعد محرر طبقات كامل."
     )
 
 
