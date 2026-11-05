@@ -136,6 +136,64 @@ def _build_catalog() -> list[dict]:
 
 TEMPLATE_CATALOG = _build_catalog()
 
+# Small curated set of real, externally hosted Wikimedia Commons photographs.
+# Only four topic families use these photos (5 format variants each); other
+# templates continue to use locally generated SVG previews.
+# The file page is the authoritative source for attribution/license details.
+PHOTO_PREVIEW_ASSETS = {
+    ("المطاعم والمقاهي", "قهوة مختصة"): {
+        "title": "Coffee Cup.jpg — صورة فنجان قهوة",
+        "preview_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Coffee_Cup.jpg/500px-Coffee_Cup.jpg",
+        "page_url": "https://commons.wikimedia.org/wiki/File:Coffee_Cup.jpg",
+        "artist": "Mickey Đại Phát",
+        "license_name": "CC BY-SA 4.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "license_notice": "نسب المؤلف ورابط الترخيص؛ وأي تعديل للصورة يخضع لشرط المشاركة بالمثل.",
+        "attribution_required": True,
+    },
+    ("العطور والتجميل", "عطر جديد"): {
+        "title": "Perfume glass bottle.jpg — صورة زجاجة عطر",
+        "preview_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/79/Perfume_glass_bottle.jpg/960px-Perfume_glass_bottle.jpg",
+        "page_url": "https://commons.wikimedia.org/wiki/File:Perfume_glass_bottle.jpg",
+        "artist": "Santeri Viinamäki",
+        "license_name": "CC BY-SA 4.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "license_notice": "نسب المؤلف ورابط الترخيص؛ وأي تعديل للصورة يخضع لشرط المشاركة بالمثل.",
+        "attribution_required": True,
+    },
+    ("العقارات والإنشاءات", "فيلا فاخرة"): {
+        "title": "Yemeni House (10053201645).jpg — صورة بيت يمني",
+        "preview_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/Yemeni_House_%2810053201645%29.jpg/960px-Yemeni_House_%2810053201645%29.jpg",
+        "page_url": "https://commons.wikimedia.org/wiki/File:Yemeni_House_(10053201645).jpg",
+        "artist": "Rod Waddington",
+        "license_name": "CC BY-SA 2.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/2.0/",
+        "license_notice": "نسب المؤلف ورابط الترخيص؛ وأي تعديل للصورة يخضع لشرط المشاركة بالمثل.",
+        "attribution_required": True,
+    },
+    ("التقنية والإلكترونيات", "هاتف ذكي"): {
+        "title": "Galaxy Nexus smartphone.jpg — صورة هاتف",
+        "preview_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ad/Galaxy_Nexus_smartphone.jpg/500px-Galaxy_Nexus_smartphone.jpg",
+        "page_url": "https://commons.wikimedia.org/wiki/File:Galaxy_Nexus_smartphone.jpg",
+        "artist": "Laihiu",
+        "license_name": "CC BY 2.5",
+        "license_url": "https://creativecommons.org/licenses/by/2.5/",
+        "license_notice": "نسب المؤلف ورابط الترخيص؛ اذكر أي تعديل أجريته على الصورة.",
+        "attribution_required": True,
+    },
+}
+
+
+def get_template_photo_preview(template: dict) -> dict | None:
+    """Return a licensed photo preview for selected topic variants, if curated."""
+    if not isinstance(template, dict):
+        return None
+    key = (str(template.get("category", "")), str(template.get("topic", "")))
+    asset = PHOTO_PREVIEW_ASSETS.get(key)
+    return dict(asset) if asset else None
+
+
+
 
 def render_preview_svg(template: dict) -> str:
     """Return an original, lightweight SVG preview for a catalog item."""
