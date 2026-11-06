@@ -180,6 +180,37 @@ PHOTO_PREVIEW_ASSETS = {
         "license_url": "https://creativecommons.org/licenses/by/2.5/",
         "license_notice": "نسب المؤلف ورابط الترخيص؛ اذكر أي تعديل أجريته على الصورة.",
         "attribution_required": True,
+    },,
+
+    ("الأزياء والملابس", "تشكيلة صيفية"): {
+        "title": "Clothing Rack of Jeans.jpg — صورة ملابس",
+        "preview_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/33/Clothing_Rack_of_Jeans.jpg/960px-Clothing_Rack_of_Jeans.jpg",
+        "page_url": "https://commons.wikimedia.org/wiki/File:Clothing_Rack_of_Jeans.jpg",
+        "artist": "Peter Griffin",
+        "license_name": "CC0 1.0",
+        "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "license_notice": "الملف مخصص للملكية العامة بموجب CC0؛ يُستحسن الاحتفاظ باسم المؤلف ورابط المصدر.",
+        "attribution_required": False,
+    },
+    ("التعليم والدورات", "دورة تدريبية"): {
+        "title": "Classroom ed.jpg — صورة قاعة تعليم",
+        "preview_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/69/Classroom_ed.jpg/960px-Classroom_ed.jpg",
+        "page_url": "https://commons.wikimedia.org/wiki/File:Classroom_ed.jpg",
+        "artist": "Rzcortes",
+        "license_name": "CC BY-SA 4.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "license_notice": "يجب نسب الصورة إلى المؤلف وإضافة رابط الترخيص؛ وأي تعديل يخضع لشرط المشاركة بالمثل.",
+        "attribution_required": True,
+    },
+    ("السفر والسياحة", "رحلة سياحية"): {
+        "title": "Zaamin Mountain Landscape.jpg — صورة طبيعة وجبال",
+        "preview_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3f/Zaamin_Mountain_Landscape.jpg/960px-Zaamin_Mountain_Landscape.jpg",
+        "page_url": "https://commons.wikimedia.org/wiki/File:Zaamin_Mountain_Landscape.jpg",
+        "artist": "Humoyun Mehridinov",
+        "license_name": "CC BY-SA 4.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "license_notice": "يجب نسب الصورة إلى المؤلف وإضافة رابط الترخيص؛ وأي تعديل يخضع لشرط المشاركة بالمثل.",
+        "attribution_required": True,
     },
 }
 
