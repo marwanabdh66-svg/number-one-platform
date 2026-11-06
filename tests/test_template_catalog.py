@@ -26,7 +26,7 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
                 self.assertFalse(asset["attribution_required"])
                 self.assertIn("CC0", asset["license_name"])
 
-    def test_only_four_topic_families_receive_photographic_previews(self):
+    def test_seven_topic_families_receive_photographic_previews(self):
         mapped_count = sum(
             get_template_photo_preview(item) is not None
             for item in TEMPLATE_CATALOG
