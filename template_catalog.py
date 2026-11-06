@@ -137,7 +137,7 @@ def _build_catalog() -> list[dict]:
 TEMPLATE_CATALOG = _build_catalog()
 
 # Small curated set of real, externally hosted Wikimedia Commons photographs.
-# Only four topic families use these photos (5 format variants each); other
+# Seven topic families use these photos (5 format variants each); other
 # templates continue to use locally generated SVG previews.
 # The file page is the authoritative source for attribution/license details.
 PHOTO_PREVIEW_ASSETS = {
@@ -180,7 +180,7 @@ PHOTO_PREVIEW_ASSETS = {
         "license_url": "https://creativecommons.org/licenses/by/2.5/",
         "license_notice": "نسب المؤلف ورابط الترخيص؛ اذكر أي تعديل أجريته على الصورة.",
         "attribution_required": True,
-    },,
+    },
 
     ("الأزياء والملابس", "تشكيلة صيفية"): {
         "title": "Clothing Rack of Jeans.jpg — صورة ملابس",
