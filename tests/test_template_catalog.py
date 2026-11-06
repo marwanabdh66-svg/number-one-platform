@@ -31,7 +31,7 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
             get_template_photo_preview(item) is not None
             for item in TEMPLATE_CATALOG
         )
-        # Four selected topics x five format variants each.
+        # Seven selected topics x five format variants each.
         self.assertEqual(mapped_count, 35)
 
     def test_unmapped_template_uses_svg_fallback(self):
