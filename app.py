@@ -7,7 +7,7 @@ import csv
 import io
 import json
 from datetime import datetime
-from template_catalog import TEMPLATE_CATALOG, render_preview_data_uri, get_template_photo_preview
+from template_catalog import TEMPLATE_CATALOG, PHOTO_PREVIEW_ASSETS, render_preview_data_uri, get_template_photo_preview
 from project_store import initialize_projects_table, save_project, list_projects, format_media_attribution
 from media_library import MediaLibraryError, search_commons_media
 
@@ -560,10 +560,15 @@ if page == "🏠 الرئيسية":
 elif page == "🎨 قوالب الإعلانات":
 
     st.subheader("🎨 مكتبة قوالب NUMBER ONE")
+    photo_preview_count = sum(
+        1 for template in TEMPLATE_CATALOG
+        if get_template_photo_preview(template) is not None
+    )
     st.caption(
-        "تضم المكتبة 400 صيغة بداية موزعة على 10 مجالات و5 مقاسات. "
-        "أضيفت عينة من 4 صور فوتوغرافية مرخصة لبعض الموضوعات (20 صيغة مقاس)، "
-        "وتبقى بقية المعاينات SVG أصلية. ليست ملفات PSD أو Canva متعددة الطبقات."
+        f"تضم المكتبة 400 صيغة بداية موزعة على 10 مجالات و5 مقاسات. "
+        f"أضيفت {len(PHOTO_PREVIEW_ASSETS)} صور فوتوغرافية مرخصة تغطي "
+        f"{photo_preview_count} صيغة قالب، وتبقى بقية المعاينات SVG أصلية. "
+        "ليست ملفات PSD أو Canva متعددة الطبقات."
     )
 
     filter_col1, filter_col2, filter_col3 = st.columns([2, 1, 1])
