@@ -13,14 +13,18 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
         self.assertEqual(len({item["id"] for item in TEMPLATE_CATALOG}), 400)
 
     def test_curated_photo_sources_have_license_and_attribution_metadata(self):
-        self.assertEqual(len(PHOTO_PREVIEW_ASSETS), 4)
+        self.assertEqual(len(PHOTO_PREVIEW_ASSETS), 7)
         for asset in PHOTO_PREVIEW_ASSETS.values():
             self.assertTrue(asset["preview_url"].startswith("https://"))
             self.assertTrue(asset["page_url"].startswith("https://commons.wikimedia.org/wiki/File:"))
             self.assertTrue(asset["license_url"].startswith("https://creativecommons.org/"))
             self.assertTrue(asset["artist"])
             self.assertTrue(asset["license_name"])
-            self.assertTrue(asset["attribution_required"])
+            if asset["license_name"].startswith("CC BY"):
+                self.assertTrue(asset["attribution_required"])
+            else:
+                self.assertFalse(asset["attribution_required"])
+                self.assertIn("CC0", asset["license_name"])
 
     def test_only_four_topic_families_receive_photographic_previews(self):
         mapped_count = sum(
@@ -28,7 +32,7 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
             for item in TEMPLATE_CATALOG
         )
         # Four selected topics x five format variants each.
-        self.assertEqual(mapped_count, 20)
+        self.assertEqual(mapped_count, 35)
 
     def test_unmapped_template_uses_svg_fallback(self):
         unmapped = next(
