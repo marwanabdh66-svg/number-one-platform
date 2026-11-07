@@ -5,7 +5,11 @@ import secrets
 import html
 import csv
 import io
+import json
 from datetime import datetime
+from template_catalog import TEMPLATE_CATALOG, PHOTO_PREVIEW_ASSETS, render_preview_data_uri, get_template_photo_preview
+from project_store import initialize_projects_table, save_project, list_projects, format_media_attribution
+from media_library import MediaLibraryError, search_commons_media
 
 # =====================================
 # NUMBER ONE - AI AD STUDIO
@@ -18,6 +22,13 @@ st.set_page_config(
 )
 
 DB = "number_one.db"
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def cached_commons_search(query, media_type, limit):
+    """Cache Commons searches for one hour to reduce external requests."""
+    return search_commons_media(query, media_type=media_type, limit=limit)
+
 
 
 # =====================================
@@ -91,6 +102,9 @@ def setup_db():
             status TEXT NOT NULL DEFAULT 'جديد'
         )
     """)
+
+    # إنشاء جدول المشاريع دون المساس بجداول المستخدمين أو المدفوعات أو الطلبات.
+    initialize_projects_table(con)
 
     # ترقية قواعد البيانات القديمة دون حذف الطلبات السابقة.
     order_columns = {
@@ -437,6 +451,7 @@ username = st.session_state.get("username")
 pages = [
     "🏠 الرئيسية",
     "🎨 قوالب الإعلانات",
+    "🖼️ مكتبة الوسائط",
     "🤖 صانع الإعلان",
     "🎬 طلب تصميم",
     "💎 الاشتراكات",
@@ -468,6 +483,9 @@ if username:
         f'<div class="welcome-strip">مرحبًا، <b>{html.escape(str(username))}</b> · يسعدنا وجودك في NUMBER ONE</div>',
         unsafe_allow_html=True
     )
+
+if st.session_state.pop("template_navigation_pending", False):
+    st.session_state["main_navigation"] = "🤖 صانع الإعلان"
 
 page = st.radio(
     "التنقل الرئيسي",
@@ -541,58 +559,343 @@ if page == "🏠 الرئيسية":
 
 elif page == "🎨 قوالب الإعلانات":
 
-    st.subheader("🎨 مكتبة القوالب والأفكار")
-
-    templates = {
-        "🍔 المطاعم": [
-            "إعلان برغر سينمائي",
-            "عرض وجبة عائلية",
-            "إعلان قهوة فاخر",
-            "إعلان افتتاح مطعم"
-        ],
-        "🏠 العقارات": [
-            "إعلان شقة للبيع",
-            "إعلان فيلا فاخرة",
-            "إعلان أرض استثمارية",
-            "إعلان مشروع سكني"
-        ],
-        "🛍️ المتاجر": [
-            "إعلان تخفيضات",
-            "إعلان منتج جديد",
-            "إعلان متجر إلكتروني",
-            "إعلان ملابس"
-        ],
-        "💈 الخدمات": [
-            "إعلان صالون",
-            "إعلان مركز تجميل",
-            "إعلان صيانة",
-            "إعلان مركز تعليمي"
-        ],
-        "💻 التقنية": [
-            "إعلان تطبيق",
-            "إعلان متجر إلكترونيات",
-            "إعلان خدمة رقمية",
-            "إعلان دورة تدريبية"
-        ]
-    }
-
-    category = st.selectbox("اختر المجال", list(templates.keys()))
-
-    template = st.selectbox(
-        "اختر القالب",
-        templates[category]
+    st.subheader("🎨 مكتبة قوالب NUMBER ONE")
+    photo_preview_count = sum(
+        1 for template in TEMPLATE_CATALOG
+        if get_template_photo_preview(template) is not None
+    )
+    st.caption(
+        f"تضم المكتبة 400 صيغة بداية موزعة على 10 مجالات و5 مقاسات. "
+        f"أضيفت {len(PHOTO_PREVIEW_ASSETS)} صور فوتوغرافية مرخصة تغطي "
+        f"{photo_preview_count} صيغة قالب، وتبقى بقية المعاينات SVG أصلية. "
+        "ليست ملفات PSD أو Canva متعددة الطبقات."
     )
 
-    st.markdown(f"""
-    <div class="card">
-        <h3 class="gold">{template}</h3>
-        <p>طوّر هذه الفكرة لتناسب مشروعك وعملاءك.</p>
-    </div>
-    """, unsafe_allow_html=True)
+    filter_col1, filter_col2, filter_col3 = st.columns([2, 1, 1])
+    with filter_col1:
+        search_query = st.text_input(
+            "ابحث باسم القالب أو المجال أو المقاس",
+            placeholder="مثال: قهوة، عقارات، قصة عمودية...",
+            key="template_search"
+        )
+    with filter_col2:
+        category_options = ["كل المجالات"] + sorted(
+            {item["category"] for item in TEMPLATE_CATALOG}
+        )
+        selected_category = st.selectbox(
+            "المجال",
+            category_options,
+            key="template_category_filter"
+        )
+    with filter_col3:
+        format_options = ["كل المقاسات"] + sorted(
+            {item["format"] for item in TEMPLATE_CATALOG}
+        )
+        selected_format = st.selectbox(
+            "المقاس",
+            format_options,
+            key="template_format_filter"
+        )
 
-    if st.button("استخدام القالب"):
-        st.session_state["template"] = template
-        st.success("تم الاختيار. انتقل إلى صانع الإعلان.")
+    normalized_query = search_query.strip().casefold()
+    filtered_templates = [
+        item for item in TEMPLATE_CATALOG
+        if (
+            selected_category == "كل المجالات"
+            or item["category"] == selected_category
+        )
+        and (
+            selected_format == "كل المقاسات"
+            or item["format"] == selected_format
+        )
+        and (
+            not normalized_query
+            or normalized_query in " ".join(
+                [
+                    item["title"],
+                    item["category"],
+                    item["topic"],
+                    item["format"],
+                    item["style"],
+                ]
+            ).casefold()
+        )
+    ]
+
+    metric_a, metric_b, metric_c = st.columns(3)
+    metric_a.metric("إجمالي الصيغ", f"{len(TEMPLATE_CATALOG):,}")
+    metric_b.metric("نتائج البحث", f"{len(filtered_templates):,}")
+    metric_c.metric("المجالات", len(category_options) - 1)
+
+    if not filtered_templates:
+        st.warning("لم نعثر على قالب يطابق البحث. جرّب كلمة أخرى أو غيّر المجال.")
+    else:
+        page_size = st.selectbox(
+            "عدد القوالب في الصفحة",
+            [6, 9, 12],
+            index=1,
+            key="template_page_size"
+        )
+        total_pages = max(
+            1,
+            (len(filtered_templates) + page_size - 1) // page_size
+        )
+        page_options = list(range(1, total_pages + 1))
+        page_number = st.selectbox(
+            f"صفحة النتائج (من {total_pages})",
+            page_options,
+            key=f"template_page_{len(filtered_templates)}_{page_size}"
+        )
+
+        first_item = (page_number - 1) * page_size
+        visible_templates = filtered_templates[first_item:first_item + page_size]
+        st.caption(
+            f"عرض {first_item + 1}–{first_item + len(visible_templates)} "
+            f"من أصل {len(filtered_templates)} نتيجة."
+        )
+
+        preview_columns = st.columns(3)
+        for index, item in enumerate(visible_templates):
+            with preview_columns[index % 3]:
+                photo_preview = get_template_photo_preview(item)
+                safe_title = html.escape(item["title"])
+                safe_category = html.escape(item["category"])
+                safe_format = html.escape(item["format"])
+                safe_style = html.escape(item["style"])
+
+                if photo_preview:
+                    st.image(
+                        photo_preview["preview_url"],
+                        caption=f"معاينة فوتوغرافية: {photo_preview['title']}",
+                        use_container_width=True,
+                    )
+                    st.markdown(
+                        f"""
+                        <div class="card" style="padding:10px;min-height:0">
+                            <div style="padding:10px 4px 2px">
+                                <div style="color:#f0cc70;font-size:12px">{safe_category}</div>
+                                <h4 style="margin:5px 0;color:#ffffff">{safe_title}</h4>
+                                <div style="color:#c7d2e5;font-size:12px">
+                                    {safe_format} · {safe_style}
+                                </div>
+                                <div style="color:#8fa2bf;font-size:11px;margin-top:7px">
+                                    {item["id"]} · صورة فوتوغرافية من Wikimedia Commons
+                                </div>
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                    st.caption(
+                        f"المؤلف: {photo_preview['artist']} · "
+                        f"الترخيص: {photo_preview['license_name']} — "
+                        f"{photo_preview['license_notice']}"
+                    )
+                    st.link_button(
+                        "صفحة المصدر والترخيص",
+                        photo_preview["page_url"],
+                        key=f"template_photo_source_{item['id']}",
+                        use_container_width=True,
+                    )
+                else:
+                    preview_uri = render_preview_data_uri(item)
+                    st.markdown(
+                        f"""
+                        <div class="card" style="padding:10px;min-height:0">
+                            <img
+                                src="{preview_uri}"
+                                alt="{safe_title}"
+                                loading="lazy"
+                                style="display:block;width:100%;height:auto;border-radius:12px"
+                            >
+                            <div style="padding:10px 4px 2px">
+                                <div style="color:#f0cc70;font-size:12px">{safe_category}</div>
+                                <h4 style="margin:5px 0;color:#ffffff">{safe_title}</h4>
+                                <div style="color:#c7d2e5;font-size:12px">
+                                    {safe_format} · {safe_style}
+                                </div>
+                                <div style="color:#8fa2bf;font-size:11px;margin-top:7px">
+                                    {item["id"]} · معاينة SVG أصلية
+                                </div>
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+
+                if st.button(
+                    "استخدام هذا القالب",
+                    key=f"use_template_{item['id']}",
+                    use_container_width=True
+                ):
+                    st.session_state["template"] = item["title"]
+                    st.session_state["selected_template_id"] = item["id"]
+                    st.session_state["ad_details_input"] = (
+                        f"القالب المختار: {item['title']}\n"
+                        f"المجال: {item['category']}\n"
+                        f"المقاس: {item['format']}\n"
+                        f"الأسلوب: {item['style']}\n"
+                        f"فكرة التصميم: {item['description']}\n"
+                        "أضف اسم مشروعك والسعر والتفاصيل التي تريد ظهورها في الإعلان."
+                    )
+                    st.session_state["template_selected_notice"] = item["title"]
+                    st.session_state["template_navigation_pending"] = True
+                    st.rerun()
+
+    st.caption(
+        "الصور الفوتوغرافية المعروضة عينة خارجية من Wikimedia Commons مع رابط المصدر والترخيص. "
+        "بقية القوالب تستخدم معاينات SVG أصلية، ولا يتوفر بعد محرر طبقات كامل."
+    )
+
+
+# =====================================
+# مكتبة الصور والفيديوهات المرخصة
+# =====================================
+
+elif page == "🖼️ مكتبة الوسائط":
+
+    st.subheader("🖼️ مكتبة الصور والفيديوهات")
+    st.caption(
+        "بحث مباشر في ملفات ويكيميديا كومنز. نعرض فقط الملفات التي تحمل ترخيصًا واضحًا "
+        "يسمح مبدئيًا بالاستخدام التجاري، مع إظهار صفحة المصدر وشروط الترخيص."
+    )
+
+    search_col, type_col = st.columns([3, 1])
+    with search_col:
+        media_query = st.text_input(
+            "ابحث عن صورة أو فيديو",
+            placeholder="مثال: قهوة، طبيعة، هاتف، مطعم...",
+            key="commons_media_query_input",
+        )
+    with type_col:
+        media_type_label = st.selectbox(
+            "نوع الوسائط",
+            ["صور", "فيديوهات"],
+            key="commons_media_type_input",
+        )
+
+    selected_media_type = "image" if media_type_label == "صور" else "video"
+    if st.button("🔎 البحث في مكتبة الوسائط", key="commons_media_search_button"):
+        st.session_state.pop("commons_media_results", None)
+        if len(media_query.strip()) < 2:
+            st.warning("اكتب حرفين على الأقل للبحث.")
+        else:
+            result_limit = 8 if selected_media_type == "image" else 4
+            try:
+                with st.spinner("جارٍ البحث عن ملفات مرخصة..."):
+                    found_media = cached_commons_search(
+                        media_query.strip(),
+                        selected_media_type,
+                        result_limit,
+                    )
+                st.session_state["commons_media_results"] = found_media
+                st.session_state["commons_media_results_type"] = selected_media_type
+                st.session_state["commons_media_results_query"] = media_query.strip()
+            except ValueError as exc:
+                st.warning(str(exc))
+            except MediaLibraryError as exc:
+                st.error(str(exc))
+
+    media_results = st.session_state.get("commons_media_results", [])
+    saved_media_type = st.session_state.get("commons_media_results_type")
+    if saved_media_type == selected_media_type:
+        st.caption(
+            f"نتائج البحث عن «{html.escape(str(st.session_state.get('commons_media_results_query', '')))}» "
+            f"— {len(media_results)} ملفًا اجتاز فحص الترخيص."
+        )
+        if not media_results:
+            st.info(
+                "لا توجد نتائج مطابقة بترخيص واضح في هذه الصفحة. جرّب كلمة أخرى؛ "
+                "ولا نعرض الملفات ذات الترخيص المجهول أو غير التجاري أو التي تمنع التعديل."
+            )
+        else:
+            media_columns = st.columns(2)
+            for index, asset in enumerate(media_results):
+                with media_columns[index % 2]:
+                    safe_title = html.escape(asset["title"])
+                    safe_license = html.escape(asset["license_name"])
+                    safe_artist = html.escape(asset["artist"] or asset["credit"] or "غير مذكور في بيانات الملف")
+                    if asset["media_type"] == "image":
+                        st.image(
+                            asset["preview_url"],
+                            caption=asset["title"],
+                            use_container_width=True,
+                        )
+                    else:
+                        if asset["preview_url"] and asset["preview_url"] != asset["media_url"]:
+                            st.image(
+                                asset["preview_url"],
+                                caption=f"معاينة: {asset['title']}",
+                                use_container_width=True,
+                            )
+                        if asset["mime"] in {"video/webm", "video/mp4", "video/ogg"}:
+                            st.video(
+                                asset["media_url"],
+                                format=asset["mime"],
+                                autoplay=False,
+                                muted=True,
+                            )
+                        else:
+                            st.info("صيغة الفيديو قد لا تعمل داخل المتصفح؛ افتح الملف من صفحة المصدر.")
+
+                    st.markdown(f"**{safe_title}**")
+                    st.caption(f"الترخيص: {safe_license} · المؤلف/المصدر: {safe_artist}")
+                    st.info(asset["license_notice"])
+                    link_col1, link_col2 = st.columns(2)
+                    with link_col1:
+                        st.link_button(
+                            "صفحة الملف والمصدر",
+                            asset["page_url"],
+                            use_container_width=True,
+                        )
+                    with link_col2:
+                        if asset["license_url"]:
+                            st.link_button(
+                                "نص الترخيص",
+                                asset["license_url"],
+                                use_container_width=True,
+                            )
+                    if asset["attribution_required"]:
+                        attribution = (
+                            f"المؤلف: {asset['artist'] or asset['credit'] or asset['title']}\n"
+                            f"الترخيص: {asset['license_name']}\n"
+                            f"المصدر: {asset['page_url']}"
+                        )
+                        st.code(attribution, language=None)
+
+                    if st.button(
+                        "➕ إضافة هذا الوسيط إلى مشروعي",
+                        key=f"attach_media_{selected_media_type}_{index}",
+                        use_container_width=True,
+                    ):
+                        st.session_state["selected_media_asset"] = {
+                            field: asset.get(field)
+                            for field in (
+                                "title", "media_type", "mime", "media_url",
+                                "preview_url", "page_url", "license_name",
+                                "license_url", "license_notice", "artist",
+                                "credit", "description", "attribution_required",
+                            )
+                        }
+                        st.success("تم اختيار الوسيط. انتقل إلى صانع الإعلان لإرفاقه بالمشروع.")
+    elif media_results:
+        st.caption("غيّرت نوع الوسائط؛ اضغط زر البحث لعرض نتائج النوع الجديد.")
+
+    selected_asset = st.session_state.get("selected_media_asset")
+    if selected_asset:
+        st.markdown("### الوسيط المحدد لمشروعك")
+        st.write(selected_asset.get("title", "وسيط محدد"))
+        st.caption(
+            f"النوع: {selected_asset.get('media_type', '')} · "
+            f"الترخيص: {selected_asset.get('license_name', '')}"
+        )
+        st.link_button("فتح صفحة المصدر", selected_asset["page_url"])
+
+    st.warning(
+        "تنبيه: الترخيص لا يلغي حقوق العلامات التجارية أو الخصوصية أو حقوق الأشخاص الظاهرين. "
+        "افتح صفحة كل ملف وراجع شروطه قبل استخدامه في إعلان تجاري. "
+        "ملفات CC BY-SA تتطلب مراعاة شرط المشاركة بالمثل عند إعداد عمل مشتق."
+    )
 
 
 # =====================================
@@ -602,6 +905,23 @@ elif page == "🎨 قوالب الإعلانات":
 elif page == "🤖 صانع الإعلان":
 
     st.subheader("🤖 صانع وصف الإعلان")
+
+    selected_notice = st.session_state.pop("template_selected_notice", None)
+    if selected_notice:
+        st.success(f"تم تحميل القالب «{selected_notice}» في نموذج الإعلان. أكمل بيانات مشروعك.")
+
+    selected_media_asset = st.session_state.get("selected_media_asset")
+    if selected_media_asset:
+        st.markdown("### 🖼️ الوسيط المرفق بالمشروع")
+        st.write(selected_media_asset.get("title", "وسيط محدد"))
+        st.caption(
+            f"{selected_media_asset.get('media_type', '')} · "
+            f"{selected_media_asset.get('license_name', '')}"
+        )
+        st.link_button("صفحة الملف والترخيص", selected_media_asset["page_url"])
+        if st.button("إزالة الوسيط من المشروع", key="remove_selected_media"):
+            st.session_state.pop("selected_media_asset", None)
+            st.rerun()
 
     business = st.text_input(
         "اسم المشروع",
@@ -632,8 +952,8 @@ elif page == "🤖 صانع الإعلان":
 
     details = st.text_area(
         "تفاصيل المنتج أو العرض",
-        value=st.session_state.get("template", ""),
-        placeholder="اكتب السعر والخصومات ومميزات المنتج..."
+        placeholder="اكتب السعر والخصومات ومميزات المنتج...",
+        key="ad_details_input"
     )
 
     if st.button("✨ إنشاء وصف الإعلان"):
@@ -679,6 +999,43 @@ Avoid spelling mistakes and unnecessary visual clutter.
             file_name="number_one_ad.txt",
             mime="text/plain"
         )
+
+        st.markdown("### 💾 حفظ المشروع")
+        st.caption("يُحفظ وصف الإعلان والقالب المرتبط به داخل حسابك؛ حفظ ملف تصميم متعدد الطبقات غير متاح بعد.")
+        st.text_input(
+            "اسم المشروع المحفوظ",
+            placeholder="مثال: إعلان افتتاح المطعم",
+            key="project_title_input"
+        )
+
+        if st.button("💾 حفظ المشروع في حسابي", key="save_ad_project"):
+            if not username:
+                st.warning("سجّل الدخول أولًا حتى يُحفظ المشروع في حسابك.")
+            else:
+                project_title = st.session_state.get("project_title_input", "").strip()
+                if not project_title:
+                    project_title = (
+                        f"مشروع {business.strip()}"
+                        if business.strip()
+                        else "مشروع إعلاني"
+                    )
+
+                con = connect_db()
+                try:
+                    project_id = save_project(
+                        con,
+                        username=username,
+                        title=project_title,
+                        prompt=st.session_state["prompt"],
+                        template_id=st.session_state.get("selected_template_id"),
+                        media=st.session_state.get("selected_media_asset"),
+                    )
+                except (sqlite3.Error, ValueError):
+                    st.error("تعذر حفظ المشروع. تحقق من تسجيل الدخول وحاول مرة أخرى.")
+                else:
+                    st.success(f"تم حفظ المشروع رقم {project_id} في حسابك.")
+                finally:
+                    con.close()
 
 
 # =====================================
@@ -841,6 +1198,8 @@ elif page == "👤 حسابي":
             ORDER BY id DESC
         """, (username,)).fetchall()
 
+        projects = list_projects(con, username)
+
         con.close()
 
         if user:
@@ -856,6 +1215,65 @@ elif page == "👤 حسابي":
                 <p>تاريخ التسجيل: {safe_created}</p>
             </div>
             """, unsafe_allow_html=True)
+
+        st.markdown("### 💾 مشاريعي المحفوظة")
+        if projects:
+            for project in projects:
+                with st.expander(
+                    f"#{project['id']} · {project['title']} · {project['created']}"
+                ):
+                    if project["template_id"]:
+                        st.caption(f"القالب المرتبط: {project['template_id']}")
+
+                    saved_media = None
+                    if project["media_json"]:
+                        try:
+                            saved_media = json.loads(project["media_json"])
+                        except (TypeError, ValueError):
+                            st.warning("تعذر قراءة بيانات الوسيط المحفوظ لهذا المشروع.")
+
+                    if saved_media:
+                        st.markdown("#### الوسيط والترخيص المحفوظان")
+                        st.caption(
+                            f"{saved_media.get('title', 'وسيط')} · "
+                            f"{saved_media.get('license_name', 'ترخيص غير محدد')}"
+                        )
+                        if saved_media.get("media_type") == "image" and saved_media.get("preview_url"):
+                            st.image(saved_media["preview_url"], use_container_width=True)
+                        elif saved_media.get("media_type") == "video":
+                            if saved_media.get("mime") in {"video/webm", "video/mp4", "video/ogg"}:
+                                st.video(saved_media["media_url"], format=saved_media["mime"], autoplay=False, muted=True)
+                            else:
+                                st.info("صيغة الفيديو غير مدعومة للعرض المباشر؛ استخدم صفحة المصدر.")
+                        st.link_button("صفحة ملف الوسائط", saved_media["page_url"])
+                        if saved_media.get("license_url"):
+                            st.link_button("شروط الترخيص", saved_media["license_url"])
+                        if saved_media.get("attribution_required"):
+                            st.caption("إسناد المؤلف والترخيص مطلوب عند استخدام هذا الوسيط.")
+                        else:
+                            st.caption("بيانات المصدر محفوظة للرجوع إليها؛ الإسناد غير مطلوب بموجب CC0/الملكية العامة.")
+                        # Keep source/license details visible for every saved asset,
+                        # including CC0 media whose attribution is not legally required.
+                        st.code(
+                            format_media_attribution(saved_media),
+                            language=None,
+                        )
+
+                    st.text_area(
+                        "وصف المشروع",
+                        value=project["prompt"],
+                        height=180,
+                        key=f"saved_project_prompt_{project['id']}"
+                    )
+                    st.download_button(
+                        "تنزيل وصف المشروع",
+                        data=project["prompt"],
+                        file_name=f"number_one_project_{project['id']}.txt",
+                        mime="text/plain",
+                        key=f"download_saved_project_{project['id']}"
+                    )
+        else:
+            st.info("لا توجد مشاريع محفوظة بعد. أنشئ وصف إعلان ثم احفظه من صانع الإعلان.")
 
         st.markdown("### طلبات الدفع السابقة")
 
