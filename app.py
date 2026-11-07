@@ -1249,10 +1249,15 @@ elif page == "👤 حسابي":
                         if saved_media.get("license_url"):
                             st.link_button("شروط الترخيص", saved_media["license_url"])
                         if saved_media.get("attribution_required"):
-                            st.code(
-                                format_media_attribution(saved_media),
-                                language=None,
-                            )
+                            st.caption("إسناد المؤلف والترخيص مطلوب عند استخدام هذا الوسيط.")
+                        else:
+                            st.caption("بيانات المصدر محفوظة للرجوع إليها؛ الإسناد غير مطلوب بموجب CC0/الملكية العامة.")
+                        # Keep source/license details visible for every saved asset,
+                        # including CC0 media whose attribution is not legally required.
+                        st.code(
+                            format_media_attribution(saved_media),
+                            language=None,
+                        )
 
                     st.text_area(
                         "وصف المشروع",
