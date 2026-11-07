@@ -136,6 +136,29 @@ class ProjectStoreMediaTests(unittest.TestCase):
                 media=media,
             )
 
+    def test_cc0_source_metadata_is_preserved_without_required_attribution(self):
+        media = self.sample_media()
+        media["license_name"] = "CC0 1.0"
+        media["license_url"] = "https://creativecommons.org/publicdomain/zero/1.0/"
+        media["license_notice"] = "Public domain dedication."
+        media["attribution_required"] = False
+
+        save_project(
+            self.connection,
+            username="user-a",
+            title="CC0 campaign",
+            prompt="Ad prompt",
+            media=media,
+        )
+        saved_media = json.loads(list_projects(self.connection, "user-a")[0]["media_json"])
+        source_details = format_media_attribution(saved_media)
+
+        self.assertFalse(saved_media["attribution_required"])
+        self.assertIn("Sample author", source_details)
+        self.assertIn("CC0 1.0", source_details)
+        self.assertIn("https://commons.wikimedia.org/wiki/File:Sample.jpg", source_details)
+        self.assertIn("https://creativecommons.org/publicdomain/zero/1.0/", source_details)
+
 
 if __name__ == "__main__":
     unittest.main()
