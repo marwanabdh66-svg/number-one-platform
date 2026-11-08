@@ -7,7 +7,7 @@ import csv
 import io
 import json
 from datetime import datetime
-from template_catalog import TEMPLATE_CATALOG, PHOTO_PREVIEW_ASSETS, render_preview_data_uri, get_template_photo_preview
+from template_catalog import TEMPLATE_CATALOG, PHOTO_PREVIEW_ASSETS, render_preview_data_uri, get_template_photo_preview, fetch_photo_preview_bytes
 from project_store import initialize_projects_table, save_project, list_projects, format_media_attribution
 from media_library import MediaLibraryError, search_commons_media
 
@@ -29,6 +29,11 @@ def cached_commons_search(query, media_type, limit):
     """Cache Commons searches for one hour to reduce external requests."""
     return search_commons_media(query, media_type=media_type, limit=limit)
 
+
+@st.cache_data(ttl=600, max_entries=32, show_spinner=False)
+def cached_template_photo(url):
+    """Cache small, validated Wikimedia preview bytes for ten minutes."""
+    return fetch_photo_preview_bytes(url)
 
 
 # =====================================
@@ -663,9 +668,14 @@ elif page == "🎨 قوالب الإعلانات":
                 safe_format = html.escape(item["format"])
                 safe_style = html.escape(item["style"])
 
-                if photo_preview:
+                photo_bytes = (
+                    cached_template_photo(photo_preview["preview_url"])
+                    if photo_preview
+                    else None
+                )
+                if photo_preview and photo_bytes:
                     st.image(
-                        photo_preview["preview_url"],
+                        photo_bytes,
                         caption=f"معاينة فوتوغرافية: {photo_preview['title']}",
                         use_container_width=True,
                     )
@@ -722,6 +732,14 @@ elif page == "🎨 قوالب الإعلانات":
                         """,
                         unsafe_allow_html=True,
                     )
+                    if photo_preview:
+                        st.caption("تعذر تحميل الصورة الخارجية مؤقتًا؛ عُرضت معاينة SVG بدلًا منها.")
+                        st.link_button(
+                            "فتح صفحة الصورة والترخيص",
+                            photo_preview["page_url"],
+                            key=f"template_photo_fallback_source_{item['id']}",
+                            use_container_width=True,
+                        )
 
                 if st.button(
                     "استخدام هذا القالب",
