@@ -9,6 +9,54 @@ from __future__ import annotations
 import base64
 from html import escape
 from itertools import product
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlsplit
+from urllib.request import Request, urlopen
+
+
+
+_PREVIEW_ALLOWED_HOSTS = frozenset({"upload.wikimedia.org", "thumb.wikimedia.org"})
+
+
+def fetch_photo_preview_bytes(
+    url: str,
+    timeout: int = 8,
+    max_bytes: int = 2_500_000,
+) -> bytes | None:
+    """Fetch a small Wikimedia photo preview safely; return None on failure.
+
+    Only HTTPS URLs from Wikimedia's upload hosts are accepted. The response
+    must have an image MIME type and stay below the byte limit so a broken or
+    oversized remote asset never blocks the template catalog.
+    """
+    try:
+        parsed = urlsplit(str(url or "").strip())
+        if (
+            parsed.scheme != "https"
+            or parsed.hostname not in _PREVIEW_ALLOWED_HOSTS
+            or parsed.port not in (None, 443)
+        ):
+            return None
+        safe_timeout = max(1, min(int(timeout), 20))
+        safe_limit = max(1, min(int(max_bytes), 5_000_000))
+        request = Request(
+            str(url).strip(),
+            headers={
+                "User-Agent": "NUMBER ONE template-preview/1.0",
+                "Accept": "image/avif,image/webp,image/jpeg,image/png,image/*",
+            },
+        )
+        with urlopen(request, timeout=safe_timeout) as response:
+            content_type = response.headers.get_content_type().casefold()
+            if not content_type.startswith("image/"):
+                return None
+            payload = response.read(safe_limit + 1)
+    except (HTTPError, URLError, TimeoutError, OSError, ValueError, TypeError):
+        return None
+
+    if not payload or len(payload) > safe_limit:
+        return None
+    return payload
 
 
 _CATEGORIES = [
