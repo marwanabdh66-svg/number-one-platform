@@ -185,7 +185,7 @@ def _build_catalog() -> list[dict]:
 TEMPLATE_CATALOG = _build_catalog()
 
 # Small curated set of real, externally hosted Wikimedia Commons photographs.
-# Seven topic families use these photos (5 format variants each); other
+# Eight topic families use these photos (5 format variants each); other
 # templates continue to use locally generated SVG previews.
 # The file page is the authoritative source for attribution/license details.
 PHOTO_PREVIEW_ASSETS = {
@@ -259,6 +259,16 @@ PHOTO_PREVIEW_ASSETS = {
         "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
         "license_notice": "يجب نسب الصورة إلى المؤلف وإضافة رابط الترخيص؛ وأي تعديل يخضع لشرط المشاركة بالمثل.",
         "attribution_required": True,
+    },
+    ("المتاجر والمنتجات", "عرض متجر"): {
+        "title": "Fruits and vegetables at a grocery store.jpg — صورة متجر منتجات",
+        "preview_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cd/Fruits_and_vegetables_at_a_grocery_store.jpg/960px-Fruits_and_vegetables_at_a_grocery_store.jpg",
+        "page_url": "https://commons.wikimedia.org/wiki/File:Fruits_and_vegetables_at_a_grocery_store.jpg",
+        "artist": "Kurt Kaiser",
+        "license_name": "CC0 1.0",
+        "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "license_notice": "الملف مخصص للملكية العامة بموجب CC0؛ يُستحسن الاحتفاظ باسم المؤلف ورابط المصدر.",
+        "attribution_required": False,
     },
 }
 
