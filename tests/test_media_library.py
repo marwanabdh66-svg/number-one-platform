@@ -108,5 +108,26 @@ class MediaLibraryNormalizationTests(unittest.TestCase):
         )
 
 
+    def test_non_wikimedia_or_insecure_asset_urls_are_excluded(self):
+        invalid_urls = [
+            ("url", "https://example.com/photo.jpg"),
+            ("thumburl", "http://upload.wikimedia.org/photo.jpg"),
+            ("descriptionurl", "https://commons.wikimedia.org.attacker.example/file"),
+            ("LicenseUrl", "https://creativecommons.org.attacker.example/licenses/by/4.0/"),
+            ("url", "https://user@upload.wikimedia.org/photo.jpg"),
+            ("url", "https://upload.wikimedia.org:444/photo.jpg"),
+        ]
+
+        for field, bad_url in invalid_urls:
+            with self.subTest(field=field, url=bad_url):
+                page = self.make_page()
+                if field == "LicenseUrl":
+                    page["imageinfo"][0]["extmetadata"][field] = {"value": bad_url}
+                else:
+                    page["imageinfo"][0][field] = bad_url
+
+                self.assertEqual(normalize_media_pages([page], "image"), [])
+
+
 if __name__ == "__main__":
     unittest.main()
