@@ -10,7 +10,7 @@ import html
 import json
 import re
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, urlopen
 
 API_URL = "https://commons.wikimedia.org/w/api.php"
@@ -35,6 +35,29 @@ def _clean_text(value: object) -> str:
 
 def _metadata_value(metadata: dict, key: str) -> str:
     return _clean_text(metadata.get(key, ""))
+
+
+_MEDIA_FILE_HOSTS = frozenset({"upload.wikimedia.org"})
+_MEDIA_PREVIEW_HOSTS = frozenset({"upload.wikimedia.org", "thumb.wikimedia.org"})
+_MEDIA_PAGE_HOSTS = frozenset({"commons.wikimedia.org"})
+_LICENSE_HOSTS = frozenset({"creativecommons.org"})
+
+
+def _is_allowed_https_url(value: str, allowed_hosts: frozenset[str]) -> bool:
+    """Accept only HTTPS links on the exact Wikimedia/Creative Commons hosts."""
+    try:
+        parsed = urlsplit(str(value or "").strip())
+        return (
+            parsed.scheme.casefold() == "https"
+            and parsed.hostname is not None
+            and parsed.hostname.casefold() in allowed_hosts
+            and parsed.port in (None, 443)
+            and not parsed.username
+            and not parsed.password
+            and bool(parsed.path)
+        )
+    except (TypeError, ValueError):
+        return False
 
 
 def _requires_attribution(metadata: dict, license_name: str, license_url: str) -> bool:
@@ -134,7 +157,16 @@ def normalize_media_pages(pages: list[dict], media_type: str) -> list[dict]:
         media_url = str(info.get("url", "")).strip()
         preview_url = str(info.get("thumburl") or media_url).strip()
         page_url = str(info.get("descriptionurl", "")).strip()
-        if not media_url or not page_url:
+        if (
+            not _is_allowed_https_url(media_url, _MEDIA_FILE_HOSTS)
+            or not _is_allowed_https_url(preview_url, _MEDIA_PREVIEW_HOSTS)
+            or not _is_allowed_https_url(page_url, _MEDIA_PAGE_HOSTS)
+            or (
+                license_url
+                and not _is_allowed_https_url(license_url, _LICENSE_HOSTS)
+            )
+        ):
+            # Never render or save third-party URLs supplied in file metadata.
             continue
 
         artist = _metadata_value(metadata, "Artist")
