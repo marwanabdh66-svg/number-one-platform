@@ -7,6 +7,7 @@ from template_catalog import (
     TEMPLATE_CATALOG,
     get_template_photo_preview,
     fetch_photo_preview_bytes,
+    search_templates,
 )
 
 
@@ -14,6 +15,27 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
     def test_catalog_keeps_400_unique_template_variants(self):
         self.assertEqual(len(TEMPLATE_CATALOG), 400)
         self.assertEqual(len({item["id"] for item in TEMPLATE_CATALOG}), 400)
+
+    def test_search_matches_template_id_and_description(self):
+        first = TEMPLATE_CATALOG[0]
+        self.assertEqual(search_templates(query=first["id"]), [first])
+
+        custom = dict(first)
+        custom["id"] = "CUSTOM-SEARCH-01"
+        custom["description"] = "عبارة اختبار فريدة للبحث"
+        self.assertEqual(
+            search_templates([custom], query="اختبار فريدة"),
+            [custom],
+        )
+
+    def test_search_combines_category_and_format_filters(self):
+        chosen = TEMPLATE_CATALOG[0]
+        results = search_templates(
+            query=chosen["topic"],
+            category=chosen["category"],
+            format_name=chosen["format"],
+        )
+        self.assertEqual(results, [chosen])
 
     def test_curated_photo_sources_have_license_and_attribution_metadata(self):
         self.assertEqual(len(PHOTO_PREVIEW_ASSETS), 8)
