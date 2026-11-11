@@ -184,6 +184,43 @@ def _build_catalog() -> list[dict]:
 
 TEMPLATE_CATALOG = _build_catalog()
 
+def search_templates(
+    templates: list[dict] | None = None,
+    query: str = "",
+    category: str | None = None,
+    format_name: str | None = None,
+) -> list[dict]:
+    """Search template metadata and apply optional category/format filters.
+
+    The search includes the template ID and description as well as the visible
+    title, topic, category, format, style, and source fields.
+    """
+    source = TEMPLATE_CATALOG if templates is None else templates
+    normalized_query = str(query or "").strip().casefold()
+    selected_category = str(category or "").strip()
+    selected_format = str(format_name or "").strip()
+    searchable_fields = (
+        "id", "title", "category", "topic", "format",
+        "style", "description", "source", "asset_type",
+    )
+
+    results = []
+    for item in source:
+        if selected_category and item.get("category") != selected_category:
+            continue
+        if selected_format and item.get("format") != selected_format:
+            continue
+        if normalized_query:
+            searchable_text = " ".join(
+                str(item.get(field, "")) for field in searchable_fields
+            ).casefold()
+            if normalized_query not in searchable_text:
+                continue
+        results.append(item)
+    return results
+
+
+
 # Small curated set of real, externally hosted Wikimedia Commons photographs.
 # Eight topic families use these photos (5 format variants each); other
 # templates continue to use locally generated SVG previews.
