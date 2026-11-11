@@ -7,7 +7,7 @@ import csv
 import io
 import json
 from datetime import datetime
-from template_catalog import TEMPLATE_CATALOG, PHOTO_PREVIEW_ASSETS, render_preview_data_uri, get_template_photo_preview, fetch_photo_preview_bytes
+from template_catalog import TEMPLATE_CATALOG, PHOTO_PREVIEW_ASSETS, render_preview_data_uri, get_template_photo_preview, fetch_photo_preview_bytes, search_templates
 from project_store import initialize_projects_table, save_project, list_projects, format_media_attribution
 from media_library import MediaLibraryError, search_commons_media
 
@@ -602,30 +602,11 @@ elif page == "🎨 قوالب الإعلانات":
             key="template_format_filter"
         )
 
-    normalized_query = search_query.strip().casefold()
-    filtered_templates = [
-        item for item in TEMPLATE_CATALOG
-        if (
-            selected_category == "كل المجالات"
-            or item["category"] == selected_category
-        )
-        and (
-            selected_format == "كل المقاسات"
-            or item["format"] == selected_format
-        )
-        and (
-            not normalized_query
-            or normalized_query in " ".join(
-                [
-                    item["title"],
-                    item["category"],
-                    item["topic"],
-                    item["format"],
-                    item["style"],
-                ]
-            ).casefold()
-        )
-    ]
+    filtered_templates = search_templates(
+        query=search_query,
+        category=None if selected_category == "كل المجالات" else selected_category,
+        format_name=None if selected_format == "كل المقاسات" else selected_format,
+    )
 
     metric_a, metric_b, metric_c = st.columns(3)
     metric_a.metric("إجمالي الصيغ", f"{len(TEMPLATE_CATALOG):,}")
