@@ -59,6 +59,90 @@ def _serialize_media_asset(media):
     return payload
 
 
+_TEMPLATE_STRING_FIELDS = (
+    "id", "category", "topic", "format", "style", "title",
+    "description", "accent", "deep", "symbol", "source", "asset_type",
+)
+_TEMPLATE_PHOTO_FIELDS = (
+    "title", "preview_url", "page_url", "artist",
+    "license_name", "license_url", "license_notice", "attribution_required",
+)
+
+
+def _serialize_template_photo(photo):
+    """Keep only curated preview and license fields from a selected template."""
+    if photo is None:
+        return None
+    if not isinstance(photo, dict):
+        raise ValueError("Template photo metadata must be an object.")
+
+    clean = {}
+    for field in _TEMPLATE_PHOTO_FIELDS:
+        value = photo.get(field)
+        if field == "attribution_required":
+            clean[field] = bool(value)
+        elif value is not None:
+            clean[field] = str(value).strip()[:2048]
+
+    for required in ("title", "preview_url", "page_url", "artist", "license_name", "license_url"):
+        if not clean.get(required):
+            raise ValueError(f"Template photo metadata is missing {required}.")
+
+    allowed_hosts = {
+        "preview_url": {"upload.wikimedia.org", "thumb.wikimedia.org"},
+        "page_url": {"commons.wikimedia.org"},
+        "license_url": {"creativecommons.org"},
+    }
+    for field, hosts in allowed_hosts.items():
+        parsed = urlparse(clean[field])
+        if (
+            parsed.scheme != "https"
+            or parsed.hostname not in hosts
+            or parsed.port not in (None, 443)
+            or parsed.username
+            or parsed.password
+        ):
+            raise ValueError("Template photo links must use approved HTTPS hosts.")
+
+    return clean
+
+
+def _serialize_template_metadata(template):
+    """Validate and serialize the selected catalog entry and its photo license."""
+    if template is None:
+        return None
+    if not isinstance(template, dict):
+        raise ValueError("Template metadata must be an object.")
+
+    clean = {}
+    for field in _TEMPLATE_STRING_FIELDS:
+        value = template.get(field)
+        if value is not None:
+            clean[field] = str(value).strip()[:2048]
+
+    for required in ("id", "category", "topic", "format", "style", "title", "description"):
+        if not clean.get(required):
+            raise ValueError(f"Template metadata is missing {required}.")
+
+    if template.get("layout") is not None:
+        try:
+            layout = int(template["layout"])
+        except (TypeError, ValueError):
+            raise ValueError("Template layout must be an integer.") from None
+        if layout < 0 or layout > 4:
+            raise ValueError("Template layout is outside the supported range.")
+        clean["layout"] = layout
+
+    photo = _serialize_template_photo(template.get("photo_preview"))
+    if photo is not None:
+        clean["photo_preview"] = photo
+
+    payload = json.dumps(clean, ensure_ascii=False, separators=(",", ":"))
+    if len(payload) > 12000:
+        raise ValueError("Template metadata is too large to save.")
+    return payload
+
+
 def format_media_attribution(media):
     """Build a reusable attribution block from saved media/license metadata."""
     if not isinstance(media, dict):
@@ -97,7 +181,8 @@ def initialize_projects_table(connection):
             template_id TEXT,
             prompt TEXT NOT NULL,
             created TEXT NOT NULL,
-            media_json TEXT
+            media_json TEXT,
+            template_json TEXT
         )
         """
     )
@@ -108,6 +193,8 @@ def initialize_projects_table(connection):
     }
     if "media_json" not in columns:
         connection.execute("ALTER TABLE projects ADD COLUMN media_json TEXT")
+    if "template_json" not in columns:
+        connection.execute("ALTER TABLE projects ADD COLUMN template_json TEXT")
 
     connection.execute(
         "CREATE INDEX IF NOT EXISTS idx_projects_username_id "
@@ -124,8 +211,9 @@ def save_project(
     template_id=None,
     created=None,
     media=None,
+    template=None,
 ):
-    """Save one advertising brief and optional licensed-media attribution metadata."""
+    """Save an advertising brief, selected catalog metadata, and optional media attribution."""
     safe_username = str(username or "").strip()
     safe_title = str(title or "").strip()
     safe_prompt = str(prompt or "").strip()
@@ -136,19 +224,26 @@ def save_project(
         raise ValueError("Project title and prompt are required.")
 
     media_json = _serialize_media_asset(media)
+    template_json = _serialize_template_metadata(template)
+    metadata_template_id = str(template.get("id") or "").strip() if template else ""
+    safe_template_id = str(template_id or metadata_template_id or "").strip() or None
+    if metadata_template_id and safe_template_id != metadata_template_id:
+        raise ValueError("Template ID does not match the saved template metadata.")
+
     cursor = connection.execute(
         """
         INSERT INTO projects
-            (username, title, template_id, prompt, created, media_json)
-        VALUES (?, ?, ?, ?, ?, ?)
+            (username, title, template_id, prompt, created, media_json, template_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
         (
             safe_username,
             safe_title,
-            str(template_id).strip() if template_id else None,
+            safe_template_id,
             safe_prompt,
             created or datetime.now().strftime("%Y-%m-%d %H:%M"),
             media_json,
+            template_json,
         ),
     )
     connection.commit()
@@ -163,7 +258,7 @@ def list_projects(connection, username):
 
     return connection.execute(
         """
-        SELECT id, title, template_id, prompt, created, media_json
+        SELECT id, title, template_id, prompt, created, media_json, template_json
         FROM projects
         WHERE username = ?
         ORDER BY id DESC

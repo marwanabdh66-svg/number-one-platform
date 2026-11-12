@@ -46,6 +46,20 @@ def connect_db():
     return con
 
 
+def template_details_text(template):
+    """Build editable Arabic brief text from a selected catalog template."""
+    return (
+        f"القالب المختار: {template.get('title', '')}\\n"
+        f"رقم القالب: {template.get('id', '')}\\n"
+        f"المجال: {template.get('category', '')}\\n"
+        f"الموضوع: {template.get('topic', '')}\\n"
+        f"المقاس: {template.get('format', '')}\\n"
+        f"الأسلوب: {template.get('style', '')}\\n"
+        f"فكرة التصميم: {template.get('description', '')}\\n"
+        "أضف اسم مشروعك والسعر والتفاصيل التي تريد ظهورها في الإعلان."
+    )
+
+
 def rows_to_csv(rows):
     """تحويل نتائج قاعدة البيانات إلى ملف CSV مناسب لبرنامج الجداول."""
     if not rows:
@@ -727,15 +741,14 @@ elif page == "🎨 قوالب الإعلانات":
                     key=f"use_template_{item['id']}",
                     use_container_width=True
                 ):
+                    selected_template = dict(item)
+                    if photo_preview:
+                        selected_template["photo_preview"] = dict(photo_preview)
+                    st.session_state["selected_template"] = selected_template
                     st.session_state["template"] = item["title"]
                     st.session_state["selected_template_id"] = item["id"]
-                    st.session_state["ad_details_input"] = (
-                        f"القالب المختار: {item['title']}\n"
-                        f"المجال: {item['category']}\n"
-                        f"المقاس: {item['format']}\n"
-                        f"الأسلوب: {item['style']}\n"
-                        f"فكرة التصميم: {item['description']}\n"
-                        "أضف اسم مشروعك والسعر والتفاصيل التي تريد ظهورها في الإعلان."
+                    st.session_state["ad_details_input"] = template_details_text(
+                        selected_template
                     )
                     st.session_state["template_selected_notice"] = item["title"]
                     st.session_state["template_navigation_pending"] = True
@@ -1028,6 +1041,7 @@ Avoid spelling mistakes and unnecessary visual clutter.
                         prompt=st.session_state["prompt"],
                         template_id=st.session_state.get("selected_template_id"),
                         media=st.session_state.get("selected_media_asset"),
+                        template=st.session_state.get("selected_template"),
                     )
                 except (sqlite3.Error, ValueError):
                     st.error("تعذر حفظ المشروع. تحقق من تسجيل الدخول وحاول مرة أخرى.")
@@ -1223,6 +1237,50 @@ elif page == "👤 حسابي":
                 ):
                     if project["template_id"]:
                         st.caption(f"القالب المرتبط: {project['template_id']}")
+
+                    saved_template = None
+                    if project["template_json"]:
+                        try:
+                            saved_template = json.loads(project["template_json"])
+                        except (TypeError, ValueError):
+                            st.warning("تعذر قراءة بيانات القالب المحفوظ لهذا المشروع.")
+
+                    if saved_template:
+                        st.markdown("#### بيانات القالب المحفوظة")
+                        st.caption(
+                            f"{saved_template.get('title', 'قالب')} · "
+                            f"{saved_template.get('category', '')} · "
+                            f"{saved_template.get('format', '')} · "
+                            f"{saved_template.get('style', '')}"
+                        )
+                        saved_template_photo = saved_template.get("photo_preview")
+                        if saved_template_photo:
+                            st.caption(
+                                f"معاينة القالب: {saved_template_photo.get('title', '')} · "
+                                f"المؤلف: {saved_template_photo.get('artist', '')} · "
+                                f"الترخيص: {saved_template_photo.get('license_name', '')}"
+                            )
+                            st.link_button(
+                                "مصدر معاينة القالب وترخيصها",
+                                saved_template_photo["page_url"],
+                                key=f"saved_template_source_{project['id']}",
+                            )
+
+                        if st.button(
+                            "إعادة استخدام هذا القالب في صانع الإعلان",
+                            key=f"reuse_saved_template_{project['id']}",
+                            use_container_width=True,
+                        ):
+                            st.session_state["selected_template"] = saved_template
+                            st.session_state["selected_template_id"] = saved_template["id"]
+                            st.session_state["template"] = saved_template["title"]
+                            st.session_state["ad_details_input"] = template_details_text(
+                                saved_template
+                            )
+                            st.session_state["template_selected_notice"] = saved_template["title"]
+                            st.session_state["template_navigation_pending"] = True
+                            st.session_state.pop("prompt", None)
+                            st.rerun()
 
                     saved_media = None
                     if project["media_json"]:
