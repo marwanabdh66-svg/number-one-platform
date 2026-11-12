@@ -48,16 +48,16 @@ def connect_db():
 
 def template_details_text(template):
     """Build editable Arabic brief text from a selected catalog template."""
-    return (
-        f"القالب المختار: {template.get('title', '')}\\n"
-        f"رقم القالب: {template.get('id', '')}\\n"
-        f"المجال: {template.get('category', '')}\\n"
-        f"الموضوع: {template.get('topic', '')}\\n"
-        f"المقاس: {template.get('format', '')}\\n"
-        f"الأسلوب: {template.get('style', '')}\\n"
-        f"فكرة التصميم: {template.get('description', '')}\\n"
-        "أضف اسم مشروعك والسعر والتفاصيل التي تريد ظهورها في الإعلان."
-    )
+    return chr(10).join([
+        f"القالب المختار: {template.get('title', '')}",
+        f"رقم القالب: {template.get('id', '')}",
+        f"المجال: {template.get('category', '')}",
+        f"الموضوع: {template.get('topic', '')}",
+        f"المقاس: {template.get('format', '')}",
+        f"الأسلوب: {template.get('style', '')}",
+        f"فكرة التصميم: {template.get('description', '')}",
+        "أضف اسم مشروعك والسعر والتفاصيل التي تريد ظهورها في الإعلان.",
+    ])
 
 
 def rows_to_csv(rows):
