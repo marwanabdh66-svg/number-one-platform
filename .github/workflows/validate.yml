@@ -21,7 +21,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       - name: فحص صياغة ملفات Python
-        run: python -m py_compile app.py template_catalog.py project_store.py media_library.py tests/test_media_library.py
+        run: python -m py_compile app.py template_catalog.py project_store.py media_library.py tests/test_media_library.py tests/test_project_store.py tests/test_template_catalog.py
       - name: اختبار حفظ المشاريع وعزل بيانات المستخدمين
         run: |
           python - <<'PY'
