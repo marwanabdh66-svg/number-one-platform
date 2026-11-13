@@ -93,6 +93,10 @@ class ProjectStoreMediaTests(unittest.TestCase):
             "style": "فاخر",
             "title": "قهوة مختصة — منشور مربع",
             "description": "تصميم إعلان تجريبي.",
+            "headline": "قهوة اليوم",
+            "subtitle": "عرض خاص لفترة محدودة",
+            "price": "2,500 ريال",
+            "call_to_action": "اطلب الآن",
             "accent": "#F2B84B",
             "deep": "#7A3E16",
             "symbol": "☕",
@@ -129,6 +133,10 @@ class ProjectStoreMediaTests(unittest.TestCase):
         self.assertEqual(saved_template["topic"], "قهوة مختصة")
         self.assertEqual(saved_template["format"], "منشور مربع")
         self.assertEqual(saved_template["layout"], 0)
+        self.assertEqual(saved_template["headline"], "قهوة اليوم")
+        self.assertEqual(saved_template["subtitle"], "عرض خاص لفترة محدودة")
+        self.assertEqual(saved_template["price"], "2,500 ريال")
+        self.assertEqual(saved_template["call_to_action"], "اطلب الآن")
         self.assertEqual(saved_template["photo_preview"]["artist"], "Sample author")
         self.assertEqual(saved_template["photo_preview"]["license_name"], "CC BY-SA 4.0")
         self.assertEqual(
@@ -235,6 +243,19 @@ class ProjectStoreMediaTests(unittest.TestCase):
         self.assertIn("CC0 1.0", source_details)
         self.assertIn("https://commons.wikimedia.org/wiki/File:Sample.jpg", source_details)
         self.assertIn("https://creativecommons.org/publicdomain/zero/1.0/", source_details)
+
+
+    def test_template_rejects_invalid_editor_colors(self):
+        template = self.sample_template()
+        template["accent"] = "#fff;fill:url(javascript:alert(1))"
+        with self.assertRaises(ValueError):
+            save_project(
+                self.connection,
+                username="user-a",
+                title="Unsafe editor colors",
+                prompt="Ad prompt",
+                template=template,
+            )
 
 
 if __name__ == "__main__":
