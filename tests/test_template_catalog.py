@@ -1,3 +1,4 @@
+import base64
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -10,6 +11,7 @@ from template_catalog import (
     search_templates,
     customize_template,
     render_preview_svg,
+    render_preview_data_uri,
 )
 
 
@@ -171,6 +173,20 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
         self.assertEqual(len(customized["price"]), 28)
         self.assertEqual(len(customized["call_to_action"]), 28)
         self.assertEqual(len(customized["symbol"]), 8)
+
+
+    def test_customized_preview_data_uri_contains_exportable_svg(self):
+        customized = customize_template(
+            TEMPLATE_CATALOG[0],
+            headline="عنوان قابل للتصدير",
+            price="3,000 ريال",
+        )
+        data_uri = render_preview_data_uri(customized)
+        self.assertTrue(data_uri.startswith("data:image/svg+xml;base64,"))
+        encoded = data_uri.split(",", 1)[1]
+        svg = base64.b64decode(encoded).decode("utf-8")
+        self.assertIn("عنوان قابل للتصدير", svg)
+        self.assertIn("3,000 ريال", svg)
 
 
 if __name__ == "__main__":
