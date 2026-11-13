@@ -189,5 +189,13 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
         self.assertIn("3,000 ريال", svg)
 
 
+    def test_optional_price_can_be_cleared_from_template_preview(self):
+        template = dict(TEMPLATE_CATALOG[0])
+        template["price"] = "5,000 ريال"
+        customized = customize_template(template, price="")
+        self.assertEqual(customized["price"], "")
+        self.assertNotIn("5,000 ريال", render_preview_svg(customized))
+
+
 if __name__ == "__main__":
     unittest.main()
