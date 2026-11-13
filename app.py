@@ -7,7 +7,7 @@ import csv
 import io
 import json
 from datetime import datetime
-from template_catalog import TEMPLATE_CATALOG, PHOTO_PREVIEW_ASSETS, render_preview_data_uri, get_template_photo_preview, fetch_photo_preview_bytes, search_templates
+from template_catalog import TEMPLATE_CATALOG, PHOTO_PREVIEW_ASSETS, render_preview_data_uri, render_preview_svg, customize_template, get_template_photo_preview, fetch_photo_preview_bytes, search_templates
 from project_store import initialize_projects_table, save_project, list_projects, format_media_attribution
 from media_library import MediaLibraryError, search_commons_media
 
@@ -48,16 +48,50 @@ def connect_db():
 
 def template_details_text(template):
     """Build editable Arabic brief text from a selected catalog template."""
-    return chr(10).join([
+    headline = template.get("headline") or template.get("topic", "")
+    subtitle = template.get("subtitle") or (
+        f"{template.get('format', '')} · {template.get('style', '')}"
+    )
+    lines = [
         f"القالب المختار: {template.get('title', '')}",
         f"رقم القالب: {template.get('id', '')}",
         f"المجال: {template.get('category', '')}",
-        f"الموضوع: {template.get('topic', '')}",
+        f"العنوان الظاهر: {headline}",
+        f"النص المساعد: {subtitle}",
         f"المقاس: {template.get('format', '')}",
         f"الأسلوب: {template.get('style', '')}",
         f"فكرة التصميم: {template.get('description', '')}",
-        "أضف اسم مشروعك والسعر والتفاصيل التي تريد ظهورها في الإعلان.",
-    ])
+    ]
+    if template.get("price"):
+        lines.append(f"السعر أو العرض: {template['price']}")
+    if template.get("call_to_action"):
+        lines.append(f"الدعوة للإجراء: {template['call_to_action']}")
+    lines.append("أضف اسم مشروعك والتفاصيل التي تريد ظهورها في الإعلان.")
+    return chr(10).join(lines)
+
+
+def template_editor_state_key(template, field):
+    """Return a stable Streamlit widget key for one selected template field."""
+    return f"template_editor_{template.get('id', 'selected')}_{field}"
+
+
+def initialize_template_editor_state(template):
+    """Load saved/default editor values before the editor widgets are created."""
+    format_name = str(template.get("format") or "").strip()
+    style_name = str(template.get("style") or "").strip()
+    defaults = {
+        "headline": template.get("headline") or template.get("topic") or "",
+        "subtitle": template.get("subtitle") or " · ".join(
+            part for part in (format_name, style_name) if part
+        ),
+        "price": template.get("price") or "",
+        "call_to_action": template.get("call_to_action") or "اكتشف العرض",
+        "accent": template.get("accent") or "#F0CC70",
+        "deep": template.get("deep") or "#243B53",
+        "symbol": template.get("symbol") or "✦",
+    }
+    for field, value in defaults.items():
+        st.session_state[template_editor_state_key(template, field)] = str(value)
 
 
 def rows_to_csv(rows):
@@ -745,6 +779,7 @@ elif page == "🎨 قوالب الإعلانات":
                     if photo_preview:
                         selected_template["photo_preview"] = dict(photo_preview)
                     st.session_state["selected_template"] = selected_template
+                    initialize_template_editor_state(selected_template)
                     st.session_state["template"] = item["title"]
                     st.session_state["selected_template_id"] = item["id"]
                     st.session_state["ad_details_input"] = template_details_text(
@@ -922,6 +957,123 @@ elif page == "🤖 صانع الإعلان":
     if selected_notice:
         st.success(f"تم تحميل القالب «{selected_notice}» في نموذج الإعلان. أكمل بيانات مشروعك.")
 
+    active_template = st.session_state.get("selected_template")
+    if active_template:
+        st.markdown("### ✏️ محرر معاينة القالب")
+        st.caption(
+            "عدّل العنوان والنص والسعر والدعوة للإجراء والألوان. "
+            "تُحفظ هذه التعديلات مع بيانات القالب عند حفظ المشروع."
+        )
+
+        editor_defaults = {
+            "headline": active_template.get("headline") or active_template.get("topic") or "",
+            "subtitle": active_template.get("subtitle") or (
+                f"{active_template.get('format', '')} · {active_template.get('style', '')}"
+            ),
+            "price": active_template.get("price") or "",
+            "call_to_action": active_template.get("call_to_action") or "اكتشف العرض",
+            "accent": active_template.get("accent") or "#F0CC70",
+            "deep": active_template.get("deep") or "#243B53",
+            "symbol": active_template.get("symbol") or "✦",
+        }
+        for field, default_value in editor_defaults.items():
+            st.session_state.setdefault(
+                template_editor_state_key(active_template, field),
+                str(default_value),
+            )
+
+        with st.expander("فتح أدوات تعديل القالب", expanded=True):
+            edit_col1, edit_col2 = st.columns(2)
+            with edit_col1:
+                edited_headline = st.text_input(
+                    "العنوان الرئيسي",
+                    max_chars=44,
+                    key=template_editor_state_key(active_template, "headline"),
+                )
+                edited_price = st.text_input(
+                    "السعر أو العرض (اختياري)",
+                    max_chars=28,
+                    key=template_editor_state_key(active_template, "price"),
+                )
+                edited_accent = st.color_picker(
+                    "لون التمييز",
+                    key=template_editor_state_key(active_template, "accent"),
+                )
+            with edit_col2:
+                edited_subtitle = st.text_input(
+                    "النص المساعد",
+                    max_chars=70,
+                    key=template_editor_state_key(active_template, "subtitle"),
+                )
+                edited_cta = st.text_input(
+                    "نص زر الدعوة للإجراء",
+                    max_chars=28,
+                    key=template_editor_state_key(active_template, "call_to_action"),
+                )
+                edited_deep = st.color_picker(
+                    "لون الخلفية الداخلية",
+                    key=template_editor_state_key(active_template, "deep"),
+                )
+            edited_symbol = st.text_input(
+                "الرمز أو الأيقونة النصية",
+                max_chars=8,
+                key=template_editor_state_key(active_template, "symbol"),
+            )
+
+        edited_template = customize_template(
+            active_template,
+            headline=edited_headline,
+            subtitle=edited_subtitle,
+            price=edited_price,
+            call_to_action=edited_cta,
+            accent=edited_accent,
+            deep=edited_deep,
+            symbol=edited_symbol,
+        )
+        st.session_state["selected_template"] = edited_template
+
+        preview_col, reference_col = st.columns([2, 1])
+        with preview_col:
+            st.markdown("#### معاينة التصميم بعد التعديل")
+            preview_uri = render_preview_data_uri(edited_template)
+            safe_preview_title = html.escape(str(edited_template.get("headline", "قالب NUMBER ONE")))
+            st.markdown(
+                f'<img src="{preview_uri}" alt="{safe_preview_title}" '
+                'style="display:block;width:100%;height:auto;border-radius:14px;border:1px solid #344663">',
+                unsafe_allow_html=True,
+            )
+            st.download_button(
+                "تنزيل معاينة التصميم SVG",
+                data=render_preview_svg(edited_template),
+                file_name="number_one_template.svg",
+                mime="image/svg+xml",
+                key=f"download_edited_template_{edited_template.get('id', 'selected')}",
+                use_container_width=True,
+            )
+        with reference_col:
+            photo_reference = edited_template.get("photo_preview")
+            if photo_reference:
+                reference_bytes = cached_template_photo(photo_reference.get("preview_url", ""))
+                if reference_bytes:
+                    st.image(
+                        reference_bytes,
+                        caption=f"الصورة المرجعية: {photo_reference.get('title', '')}",
+                        use_container_width=True,
+                    )
+                else:
+                    st.caption("تعذر تحميل الصورة المرجعية الآن؛ بيانات المصدر والترخيص ما زالت محفوظة.")
+                st.link_button(
+                    "صفحة الصورة والترخيص",
+                    photo_reference["page_url"],
+                    use_container_width=True,
+                )
+            else:
+                st.info("هذا القالب يستخدم معاينة SVG أصلية ولا يرتبط بصورة فوتوغرافية محددة.")
+        st.caption(
+            "المحرر الحالي يتيح تعديل النصوص والألوان والرمز وتصدير SVG. "
+            "تحرير الطبقات المستقلة وإخراج PNG لم يُفعّلا بعد."
+        )
+
     selected_media_asset = st.session_state.get("selected_media_asset")
     if selected_media_asset:
         st.markdown("### 🖼️ الوسيط المرفق بالمشروع")
@@ -991,6 +1143,20 @@ Make the business name prominent.
 Avoid spelling mistakes and unnecessary visual clutter.
 """
 
+            selected_template_for_prompt = st.session_state.get("selected_template")
+            if selected_template_for_prompt:
+                prompt += (
+                    "\\nSelected NUMBER ONE template: "
+                    + str(selected_template_for_prompt.get("title", ""))
+                    + "\\nEditable headline: "
+                    + str(selected_template_for_prompt.get("headline", ""))
+                    + "\\nEditable subtitle: "
+                    + str(selected_template_for_prompt.get("subtitle", ""))
+                    + "\\nPrice or offer: "
+                    + str(selected_template_for_prompt.get("price", ""))
+                    + "\\nCall to action: "
+                    + str(selected_template_for_prompt.get("call_to_action", ""))
+                )
             st.session_state["prompt"] = prompt
 
     st.info("🖼️ إنشاء الصور والفيديوهات تلقائيًا داخل NUMBER ONE: قريبًا.")
@@ -1253,6 +1419,19 @@ elif page == "👤 حسابي":
                             f"{saved_template.get('format', '')} · "
                             f"{saved_template.get('style', '')}"
                         )
+                        saved_preview_uri = render_preview_data_uri(saved_template)
+                        st.markdown(
+                            f'<img src="{saved_preview_uri}" alt="معاينة المشروع المحفوظ" '
+                            'style="display:block;width:100%;max-width:720px;height:auto;border-radius:12px">',
+                            unsafe_allow_html=True,
+                        )
+                        st.download_button(
+                            "تنزيل معاينة القالب المحفوظ SVG",
+                            data=render_preview_svg(saved_template),
+                            file_name=f"number_one_project_{project['id']}.svg",
+                            mime="image/svg+xml",
+                            key=f"download_saved_template_{project['id']}",
+                        )
                         saved_template_photo = saved_template.get("photo_preview")
                         if saved_template_photo:
                             st.caption(
@@ -1272,6 +1451,7 @@ elif page == "👤 حسابي":
                             use_container_width=True,
                         ):
                             st.session_state["selected_template"] = saved_template
+                            initialize_template_editor_state(saved_template)
                             st.session_state["selected_template_id"] = saved_template["id"]
                             st.session_state["template"] = saved_template["title"]
                             st.session_state["ad_details_input"] = template_details_text(
