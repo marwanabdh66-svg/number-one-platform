@@ -1,5 +1,6 @@
 """Small, testable SQLite helpers for NUMBER ONE saved projects."""
 import json
+import re
 from datetime import datetime
 from urllib.parse import urlparse
 
@@ -62,6 +63,7 @@ def _serialize_media_asset(media):
 _TEMPLATE_STRING_FIELDS = (
     "id", "category", "topic", "format", "style", "title",
     "description", "accent", "deep", "symbol", "source", "asset_type",
+    "headline", "subtitle", "price", "call_to_action",
 )
 _TEMPLATE_PHOTO_FIELDS = (
     "title", "preview_url", "page_url", "artist",
@@ -123,6 +125,21 @@ def _serialize_template_metadata(template):
     for required in ("id", "category", "topic", "format", "style", "title", "description"):
         if not clean.get(required):
             raise ValueError(f"Template metadata is missing {required}.")
+
+    editable_limits = {
+        "headline": 44,
+        "subtitle": 70,
+        "price": 28,
+        "call_to_action": 28,
+        "symbol": 8,
+    }
+    for field, limit in editable_limits.items():
+        if field in clean:
+            clean[field] = clean[field][:limit]
+
+    for field in ("accent", "deep"):
+        if field in clean and not re.fullmatch(r"#[0-9a-fA-F]{6}", clean[field]):
+            raise ValueError(f"Template {field} must be a six-digit hex color.")
 
     if template.get("layout") is not None:
         try:
