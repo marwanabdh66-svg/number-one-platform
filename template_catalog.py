@@ -365,7 +365,7 @@ def customize_template(
     for field, (provided, fallback, limit) in text_values.items():
         raw_value = provided if provided is not None else fallback
         cleaned = str(raw_value or "").strip()
-        if not cleaned and fallback:
+        if not cleaned and fallback and field != "price":
             cleaned = str(fallback).strip()
         result[field] = cleaned[:limit]
 
