@@ -7,6 +7,7 @@ These are starter concepts, not layered PSD/Canva source files.
 from __future__ import annotations
 
 import base64
+import re
 from html import escape
 from itertools import product
 from urllib.error import HTTPError, URLError
@@ -321,15 +322,80 @@ def get_template_photo_preview(template: dict) -> dict | None:
 
 
 
+
+def _safe_template_color(value, fallback="#F0CC70"):
+    """Accept only six-digit hex colors before embedding values in SVG."""
+    candidate = str(value or "").strip()
+    if re.fullmatch(r"#[0-9a-fA-F]{6}", candidate):
+        return candidate.upper()
+    fallback_value = str(fallback or "#F0CC70").strip()
+    if re.fullmatch(r"#[0-9a-fA-F]{6}", fallback_value):
+        return fallback_value.upper()
+    return "#F0CC70"
+
+
+def customize_template(
+    template: dict,
+    *,
+    headline=None,
+    subtitle=None,
+    price=None,
+    call_to_action=None,
+    accent=None,
+    deep=None,
+    symbol=None,
+) -> dict:
+    """Return a safe editable copy of a catalog template without mutating its source."""
+    if not isinstance(template, dict):
+        raise ValueError("Template metadata must be an object.")
+
+    result = dict(template)
+    topic = str(result.get("topic") or "تصميم إعلان").strip()
+    format_name = str(result.get("format") or "").strip()
+    style_name = str(result.get("style") or "").strip()
+    default_subtitle = " · ".join(part for part in (format_name, style_name) if part)
+
+    text_values = {
+        "headline": (headline, result.get("headline") or topic, 44),
+        "subtitle": (subtitle, result.get("subtitle") or default_subtitle, 70),
+        "price": (price, result.get("price") or "", 28),
+        "call_to_action": (call_to_action, result.get("call_to_action") or "اكتشف العرض", 28),
+        "symbol": (symbol, result.get("symbol") or "✦", 8),
+    }
+    for field, (provided, fallback, limit) in text_values.items():
+        raw_value = provided if provided is not None else fallback
+        cleaned = str(raw_value or "").strip()
+        if not cleaned and fallback:
+            cleaned = str(fallback).strip()
+        result[field] = cleaned[:limit]
+
+    result["accent"] = _safe_template_color(
+        accent if accent is not None else result.get("accent"),
+        result.get("accent") or "#F0CC70",
+    )
+    result["deep"] = _safe_template_color(
+        deep if deep is not None else result.get("deep"),
+        result.get("deep") or "#243B53",
+    )
+    return result
+
+
 def render_preview_svg(template: dict) -> str:
     """Return an original, lightweight SVG preview for a catalog item."""
-    title = escape(str(template["topic"]))
+    raw_format = str(template["format"])
+    raw_style = str(template["style"])
+    title = escape(str(template.get("headline") or template["topic"]))
     category = escape(str(template["category"]))
-    format_name = escape(str(template["format"]))
-    style = escape(str(template["style"]))
-    accent = template["accent"]
-    deep = template["deep"]
-    symbol = escape(str(template["symbol"]))
+    format_name = escape(raw_format)
+    style = escape(raw_style)
+    subtitle = escape(str(
+        template.get("subtitle") or " · ".join(part for part in (raw_format, raw_style) if part)
+    ))
+    price = escape(str(template.get("price") or "").strip())
+    call_to_action = escape(str(template.get("call_to_action") or "اكتشف العرض"))
+    accent = _safe_template_color(template.get("accent"), "#F0CC70")
+    deep = _safe_template_color(template.get("deep"), "#243B53")
+    symbol = escape(str(template.get("symbol") or "✦"))
     layout = int(template["layout"]) % 5
 
     art_by_layout = [
@@ -368,6 +434,10 @@ def render_preview_svg(template: dict) -> str:
         """,
     ]
     art = art_by_layout[layout]
+    price_markup = (
+        f'<text x="835" y="370" fill="{accent}" font-size="31" font-weight="800" text-anchor="end" font-family="Cairo, Arial, sans-serif" direction="rtl">{price}</text>'
+        if price else ""
+    )
 
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600" role="img" aria-label="{title}">
       <defs>
@@ -388,10 +458,11 @@ def render_preview_svg(template: dict) -> str:
       {art}
       <text x="835" y="90" fill="{accent}" font-size="25" font-weight="800" text-anchor="end" font-family="Cairo, Arial, sans-serif">NUMBER ONE</text>
       <text x="835" y="142" fill="#C7D2E5" font-size="19" text-anchor="end" font-family="Cairo, Arial, sans-serif" direction="rtl">{category}</text>
-      <text x="835" y="260" fill="#FFFFFF" font-size="43" font-weight="800" text-anchor="end" font-family="Cairo, Arial, sans-serif" direction="rtl">{title}</text>
-      <text x="835" y="315" fill="#C7D2E5" font-size="22" text-anchor="end" font-family="Cairo, Arial, sans-serif" direction="rtl">{format_name} · {style}</text>
-      <rect x="625" y="390" width="210" height="62" rx="18" fill="{accent}"/>
-      <text x="730" y="430" fill="#101827" font-size="23" font-weight="800" text-anchor="middle" font-family="Cairo, Arial, sans-serif" direction="rtl">اكتشف العرض</text>
+      <text x="835" y="260" fill="#FFFFFF" font-size="43" font-weight="800" text-anchor="end" textLength="360" lengthAdjust="spacingAndGlyphs" font-family="Cairo, Arial, sans-serif" direction="rtl">{title}</text>
+      <text x="835" y="315" fill="#C7D2E5" font-size="22" text-anchor="end" textLength="360" lengthAdjust="spacingAndGlyphs" font-family="Cairo, Arial, sans-serif" direction="rtl">{subtitle}</text>
+      {price_markup}
+      <rect x="625" y="405" width="210" height="62" rx="18" fill="{accent}"/>
+      <text x="730" y="445" fill="#101827" font-size="23" font-weight="800" text-anchor="middle" font-family="Cairo, Arial, sans-serif" direction="rtl">{call_to_action}</text>
       <text x="835" y="520" fill="#9AAAC3" font-size="16" text-anchor="end" font-family="Cairo, Arial, sans-serif" direction="rtl">معاينة SVG أصلية قابلة للتطوير</text>
       <text x="230" y="520" fill="{accent}" font-size="64" text-anchor="middle" font-family="Arial, sans-serif">{symbol}</text>
     </svg>"""
