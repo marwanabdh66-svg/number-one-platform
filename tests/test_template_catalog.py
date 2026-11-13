@@ -8,6 +8,8 @@ from template_catalog import (
     get_template_photo_preview,
     fetch_photo_preview_bytes,
     search_templates,
+    customize_template,
+    render_preview_svg,
 )
 
 
@@ -113,6 +115,62 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
                     max_bytes=4,
                 )
             )
+
+
+    def test_customized_template_renders_escaped_text_and_user_price(self):
+        original = dict(TEMPLATE_CATALOG[0])
+        customized = customize_template(
+            original,
+            headline="<script>alert(1)</script>",
+            subtitle="حملة موسمية",
+            price="5,000 ريال",
+            call_to_action="اطلب الآن",
+            accent="#12abef",
+            deep="#223344",
+            symbol="⭐",
+        )
+
+        self.assertNotIn("headline", original)
+        self.assertEqual(customized["headline"], "<script>alert(1)</script>")
+        self.assertEqual(customized["accent"], "#12ABEF")
+        self.assertEqual(customized["deep"], "#223344")
+
+        svg = render_preview_svg(customized)
+        self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", svg)
+        self.assertNotIn("<script>", svg)
+        self.assertIn("حملة موسمية", svg)
+        self.assertIn("5,000 ريال", svg)
+        self.assertIn("اطلب الآن", svg)
+
+    def test_custom_template_rejects_unsafe_color_values(self):
+        original = TEMPLATE_CATALOG[0]
+        customized = customize_template(
+            original,
+            accent='red" onload="alert(1)',
+            deep="url(javascript:alert(1))",
+        )
+
+        self.assertEqual(customized["accent"], original["accent"].upper())
+        self.assertEqual(customized["deep"], original["deep"].upper())
+        svg = render_preview_svg(customized)
+        self.assertNotIn("javascript:", svg)
+        self.assertNotIn("onload=", svg)
+
+    def test_custom_template_text_fields_are_length_limited(self):
+        customized = customize_template(
+            TEMPLATE_CATALOG[0],
+            headline="ع" * 100,
+            subtitle="و" * 100,
+            price="س" * 100,
+            call_to_action="ط" * 100,
+            symbol="★" * 20,
+        )
+
+        self.assertEqual(len(customized["headline"]), 44)
+        self.assertEqual(len(customized["subtitle"]), 70)
+        self.assertEqual(len(customized["price"]), 28)
+        self.assertEqual(len(customized["call_to_action"]), 28)
+        self.assertEqual(len(customized["symbol"]), 8)
 
 
 if __name__ == "__main__":
