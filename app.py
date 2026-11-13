@@ -1146,15 +1146,15 @@ Avoid spelling mistakes and unnecessary visual clutter.
             selected_template_for_prompt = st.session_state.get("selected_template")
             if selected_template_for_prompt:
                 prompt += (
-                    "\\nSelected NUMBER ONE template: "
+                    "\nSelected NUMBER ONE template: "
                     + str(selected_template_for_prompt.get("title", ""))
-                    + "\\nEditable headline: "
+                    + "\nEditable headline: "
                     + str(selected_template_for_prompt.get("headline", ""))
-                    + "\\nEditable subtitle: "
+                    + "\nEditable subtitle: "
                     + str(selected_template_for_prompt.get("subtitle", ""))
-                    + "\\nPrice or offer: "
+                    + "\nPrice or offer: "
                     + str(selected_template_for_prompt.get("price", ""))
-                    + "\\nCall to action: "
+                    + "\nCall to action: "
                     + str(selected_template_for_prompt.get("call_to_action", ""))
                 )
             st.session_state["prompt"] = prompt
