@@ -466,6 +466,7 @@ def render_preview_svg(template: dict) -> str:
     ]
     art = art_by_layout[layout]
     layer_visibility = _normalize_layer_visibility(template.get("layer_visibility"))
+    accessible_label = title if layer_visibility["headline"] else category
     headline_markup = (
         f'<text x="835" y="260" fill="#FFFFFF" font-size="43" font-weight="800" text-anchor="end" textLength="360" lengthAdjust="spacingAndGlyphs" font-family="Cairo, Arial, sans-serif" direction="rtl">{title}</text>'
         if layer_visibility["headline"] else ""
@@ -488,7 +489,7 @@ def render_preview_svg(template: dict) -> str:
         if layer_visibility["symbol"] else ""
     )
 
-    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600" role="img" aria-label="{title}">
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600" role="img" aria-label="{accessible_label}">
       <defs>
         <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stop-color="#182842"/>
