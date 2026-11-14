@@ -69,6 +69,9 @@ _TEMPLATE_PHOTO_FIELDS = (
     "title", "preview_url", "page_url", "artist",
     "license_name", "license_url", "license_notice", "attribution_required",
 )
+_TEMPLATE_LAYER_KEYS = (
+    "headline", "subtitle", "price", "call_to_action", "symbol",
+)
 
 
 def _serialize_template_photo(photo):
@@ -140,6 +143,20 @@ def _serialize_template_metadata(template):
     for field in ("accent", "deep"):
         if field in clean and not re.fullmatch(r"#[0-9a-fA-F]{6}", clean[field]):
             raise ValueError(f"Template {field} must be a six-digit hex color.")
+
+    layer_visibility = template.get("layer_visibility")
+    if layer_visibility is not None:
+        if not isinstance(layer_visibility, dict):
+            raise ValueError("Template layer visibility must be an object.")
+        clean_visibility = {}
+        for layer_name in _TEMPLATE_LAYER_KEYS:
+            visible = layer_visibility.get(layer_name, True)
+            if not isinstance(visible, bool):
+                raise ValueError(
+                    f"Template layer visibility for {layer_name} must be boolean."
+                )
+            clean_visibility[layer_name] = visible
+        clean["layer_visibility"] = clean_visibility
 
     if template.get("layout") is not None:
         try:
