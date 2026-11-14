@@ -93,6 +93,14 @@ def initialize_template_editor_state(template):
     for field, value in defaults.items():
         st.session_state[template_editor_state_key(template, field)] = str(value)
 
+    saved_visibility = template.get("layer_visibility")
+    if not isinstance(saved_visibility, dict):
+        saved_visibility = {}
+    for layer_name in ("headline", "subtitle", "price", "call_to_action", "symbol"):
+        st.session_state[
+            template_editor_state_key(template, f"layer_{layer_name}")
+        ] = bool(saved_visibility.get(layer_name, True))
+
 
 def rows_to_csv(rows):
     """تحويل نتائج قاعدة البيانات إلى ملف CSV مناسب لبرنامج الجداول."""
@@ -982,6 +990,15 @@ elif page == "🤖 صانع الإعلان":
                 str(default_value),
             )
 
+        saved_visibility = active_template.get("layer_visibility")
+        if not isinstance(saved_visibility, dict):
+            saved_visibility = {}
+        for layer_name in ("headline", "subtitle", "price", "call_to_action", "symbol"):
+            st.session_state.setdefault(
+                template_editor_state_key(active_template, f"layer_{layer_name}"),
+                bool(saved_visibility.get(layer_name, True)),
+            )
+
         with st.expander("فتح أدوات تعديل القالب", expanded=True):
             edit_col1, edit_col2 = st.columns(2)
             with edit_col1:
@@ -1020,6 +1037,38 @@ elif page == "🤖 صانع الإعلان":
                 key=template_editor_state_key(active_template, "symbol"),
             )
 
+            st.markdown("#### إظهار وإخفاء عناصر التصميم")
+            layer_col1, layer_col2 = st.columns(2)
+            with layer_col1:
+                show_headline = st.checkbox(
+                    "إظهار العنوان الرئيسي",
+                    key=template_editor_state_key(active_template, "layer_headline"),
+                )
+                show_subtitle = st.checkbox(
+                    "إظهار النص المساعد",
+                    key=template_editor_state_key(active_template, "layer_subtitle"),
+                )
+                show_price = st.checkbox(
+                    "إظهار السعر أو العرض",
+                    key=template_editor_state_key(active_template, "layer_price"),
+                )
+            with layer_col2:
+                show_cta = st.checkbox(
+                    "إظهار زر الدعوة للإجراء",
+                    key=template_editor_state_key(active_template, "layer_call_to_action"),
+                )
+                show_symbol = st.checkbox(
+                    "إظهار الرمز أو الأيقونة",
+                    key=template_editor_state_key(active_template, "layer_symbol"),
+                )
+
+        edited_layer_visibility = {
+            "headline": show_headline,
+            "subtitle": show_subtitle,
+            "price": show_price,
+            "call_to_action": show_cta,
+            "symbol": show_symbol,
+        }
         edited_template = customize_template(
             active_template,
             headline=edited_headline,
@@ -1029,6 +1078,7 @@ elif page == "🤖 صانع الإعلان":
             accent=edited_accent,
             deep=edited_deep,
             symbol=edited_symbol,
+            layer_visibility=edited_layer_visibility,
         )
         st.session_state["selected_template"] = edited_template
 
@@ -1070,8 +1120,8 @@ elif page == "🤖 صانع الإعلان":
             else:
                 st.info("هذا القالب يستخدم معاينة SVG أصلية ولا يرتبط بصورة فوتوغرافية محددة.")
         st.caption(
-            "المحرر الحالي يتيح تعديل النصوص والألوان والرمز وتصدير SVG. "
-            "تحرير الطبقات المستقلة وإخراج PNG لم يُفعّلا بعد."
+            "يمكنك الآن إظهار أو إخفاء العنوان والنص والسعر والزر والرمز كلٌّ على حدة. "
+            "تُحفظ حالة هذه العناصر مع القالب؛ أما تحريك الطبقات وتغيير مواضعها وتصدير PNG فلم يُفعّل بعد."
         )
 
     selected_media_asset = st.session_state.get("selected_media_asset")
