@@ -257,6 +257,37 @@ class ProjectStoreMediaTests(unittest.TestCase):
                 template=template,
             )
 
+    def test_project_preserves_layer_visibility_settings(self):
+        template = self.sample_template()
+        template["layer_visibility"] = {
+            "headline": False,
+            "subtitle": True,
+            "price": False,
+            "call_to_action": True,
+            "symbol": False,
+        }
+        save_project(
+            self.connection,
+            username="user-a",
+            title="Layer visibility campaign",
+            prompt="Ad prompt",
+            template=template,
+        )
+        saved = json.loads(list_projects(self.connection, "user-a")[0]["template_json"])
+        self.assertEqual(saved["layer_visibility"], template["layer_visibility"])
+
+    def test_project_rejects_non_boolean_layer_visibility(self):
+        template = self.sample_template()
+        template["layer_visibility"] = {"headline": "no"}
+        with self.assertRaises(ValueError):
+            save_project(
+                self.connection,
+                username="user-a",
+                title="Invalid layer visibility",
+                prompt="Ad prompt",
+                template=template,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
