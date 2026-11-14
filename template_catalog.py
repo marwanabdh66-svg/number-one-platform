@@ -334,6 +334,30 @@ def _safe_template_color(value, fallback="#F0CC70"):
     return "#F0CC70"
 
 
+_LAYER_VISIBILITY_KEYS = (
+    "headline",
+    "subtitle",
+    "price",
+    "call_to_action",
+    "symbol",
+)
+
+
+def _normalize_layer_visibility(value) -> dict:
+    """Return safe visibility flags for the editable SVG text layers."""
+    visibility = {name: True for name in _LAYER_VISIBILITY_KEYS}
+    if value is None:
+        return visibility
+    if not isinstance(value, dict):
+        raise ValueError("Layer visibility must be an object.")
+    for name in _LAYER_VISIBILITY_KEYS:
+        candidate = value.get(name, True)
+        if not isinstance(candidate, bool):
+            raise ValueError(f"Layer visibility for {name} must be boolean.")
+        visibility[name] = candidate
+    return visibility
+
+
 def customize_template(
     template: dict,
     *,
@@ -344,6 +368,7 @@ def customize_template(
     accent=None,
     deep=None,
     symbol=None,
+    layer_visibility=None,
 ) -> dict:
     """Return a safe editable copy of a catalog template without mutating its source."""
     if not isinstance(template, dict):
@@ -377,6 +402,12 @@ def customize_template(
         deep if deep is not None else result.get("deep"),
         result.get("deep") or "#243B53",
     )
+    visibility_source = (
+        layer_visibility
+        if layer_visibility is not None
+        else result.get("layer_visibility")
+    )
+    result["layer_visibility"] = _normalize_layer_visibility(visibility_source)
     return result
 
 
@@ -434,9 +465,27 @@ def render_preview_svg(template: dict) -> str:
         """,
     ]
     art = art_by_layout[layout]
+    layer_visibility = _normalize_layer_visibility(template.get("layer_visibility"))
+    headline_markup = (
+        f'<text x="835" y="260" fill="#FFFFFF" font-size="43" font-weight="800" text-anchor="end" textLength="360" lengthAdjust="spacingAndGlyphs" font-family="Cairo, Arial, sans-serif" direction="rtl">{title}</text>'
+        if layer_visibility["headline"] else ""
+    )
+    subtitle_markup = (
+        f'<text x="835" y="315" fill="#C7D2E5" font-size="22" text-anchor="end" textLength="360" lengthAdjust="spacingAndGlyphs" font-family="Cairo, Arial, sans-serif" direction="rtl">{subtitle}</text>'
+        if layer_visibility["subtitle"] else ""
+    )
     price_markup = (
         f'<text x="835" y="370" fill="{accent}" font-size="31" font-weight="800" text-anchor="end" font-family="Cairo, Arial, sans-serif" direction="rtl">{price}</text>'
-        if price else ""
+        if price and layer_visibility["price"] else ""
+    )
+    cta_markup = (
+        f'<rect x="625" y="405" width="210" height="62" rx="18" fill="{accent}"/>'
+        f'<text x="730" y="445" fill="#101827" font-size="23" font-weight="800" text-anchor="middle" font-family="Cairo, Arial, sans-serif" direction="rtl">{call_to_action}</text>'
+        if layer_visibility["call_to_action"] else ""
+    )
+    symbol_markup = (
+        f'<text x="230" y="520" fill="{accent}" font-size="64" text-anchor="middle" font-family="Arial, sans-serif">{symbol}</text>'
+        if layer_visibility["symbol"] else ""
     )
 
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600" role="img" aria-label="{title}">
@@ -458,13 +507,12 @@ def render_preview_svg(template: dict) -> str:
       {art}
       <text x="835" y="90" fill="{accent}" font-size="25" font-weight="800" text-anchor="end" font-family="Cairo, Arial, sans-serif">NUMBER ONE</text>
       <text x="835" y="142" fill="#C7D2E5" font-size="19" text-anchor="end" font-family="Cairo, Arial, sans-serif" direction="rtl">{category}</text>
-      <text x="835" y="260" fill="#FFFFFF" font-size="43" font-weight="800" text-anchor="end" textLength="360" lengthAdjust="spacingAndGlyphs" font-family="Cairo, Arial, sans-serif" direction="rtl">{title}</text>
-      <text x="835" y="315" fill="#C7D2E5" font-size="22" text-anchor="end" textLength="360" lengthAdjust="spacingAndGlyphs" font-family="Cairo, Arial, sans-serif" direction="rtl">{subtitle}</text>
+      {headline_markup}
+      {subtitle_markup}
       {price_markup}
-      <rect x="625" y="405" width="210" height="62" rx="18" fill="{accent}"/>
-      <text x="730" y="445" fill="#101827" font-size="23" font-weight="800" text-anchor="middle" font-family="Cairo, Arial, sans-serif" direction="rtl">{call_to_action}</text>
+      {cta_markup}
       <text x="835" y="520" fill="#9AAAC3" font-size="16" text-anchor="end" font-family="Cairo, Arial, sans-serif" direction="rtl">معاينة SVG أصلية قابلة للتطوير</text>
-      <text x="230" y="520" fill="{accent}" font-size="64" text-anchor="middle" font-family="Arial, sans-serif">{symbol}</text>
+      {symbol_markup}
     </svg>"""
 
 
