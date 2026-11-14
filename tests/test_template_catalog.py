@@ -222,6 +222,7 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
         self.assertEqual(customized["headline"], "عنوان طبقة مخفية")
         self.assertEqual(customized["price"], "سعر محفوظ مخفي")
         self.assertFalse(customized["layer_visibility"]["headline"])
+        self.assertIn('aria-label="المطاعم والمقاهي"', svg)
         self.assertIn("نص طبقة ظاهرة", svg)
         self.assertNotIn("عنوان طبقة مخفية", svg)
         self.assertNotIn("سعر محفوظ مخفي", svg)
