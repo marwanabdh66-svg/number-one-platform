@@ -196,6 +196,45 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
         self.assertEqual(customized["price"], "")
         self.assertNotIn("5,000 ريال", render_preview_svg(customized))
 
+    def test_legacy_template_layers_default_to_visible(self):
+        svg = render_preview_svg(TEMPLATE_CATALOG[0])
+        self.assertIn("NUMBER ONE", svg)
+        self.assertIn(TEMPLATE_CATALOG[0]["topic"], svg)
+        self.assertIn("معاينة SVG أصلية قابلة للتطوير", svg)
+
+    def test_visibility_controls_hide_individual_layers_without_erasing_values(self):
+        customized = customize_template(
+            TEMPLATE_CATALOG[0],
+            headline="عنوان طبقة مخفية",
+            subtitle="نص طبقة ظاهرة",
+            price="سعر محفوظ مخفي",
+            call_to_action="زر مخفي",
+            symbol="★",
+            layer_visibility={
+                "headline": False,
+                "subtitle": True,
+                "price": False,
+                "call_to_action": False,
+                "symbol": False,
+            },
+        )
+        svg = render_preview_svg(customized)
+        self.assertEqual(customized["headline"], "عنوان طبقة مخفية")
+        self.assertEqual(customized["price"], "سعر محفوظ مخفي")
+        self.assertFalse(customized["layer_visibility"]["headline"])
+        self.assertIn("نص طبقة ظاهرة", svg)
+        self.assertNotIn("عنوان طبقة مخفية", svg)
+        self.assertNotIn("سعر محفوظ مخفي", svg)
+        self.assertNotIn("زر مخفي", svg)
+        self.assertNotIn(">★</text>", svg)
+
+    def test_visibility_flags_must_be_boolean(self):
+        with self.assertRaises(ValueError):
+            customize_template(
+                TEMPLATE_CATALOG[0],
+                layer_visibility={"headline": "false"},
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
