@@ -72,6 +72,7 @@ _TEMPLATE_PHOTO_FIELDS = (
 _TEMPLATE_LAYER_KEYS = (
     "headline", "subtitle", "price", "call_to_action", "symbol",
 )
+_TEMPLATE_POSITION_AXES = ("x", "y")
 
 
 def _serialize_template_photo(photo):
@@ -157,6 +158,38 @@ def _serialize_template_metadata(template):
                 )
             clean_visibility[layer_name] = visible
         clean["layer_visibility"] = clean_visibility
+
+    layer_positions = template.get("layer_positions")
+    if layer_positions is not None:
+        if not isinstance(layer_positions, dict):
+            raise ValueError("Template layer positions must be an object.")
+        clean_positions = {}
+        for layer_name, coordinates in layer_positions.items():
+            if layer_name not in _TEMPLATE_LAYER_KEYS:
+                raise ValueError(f"Unknown template layer position: {layer_name}.")
+            if not isinstance(coordinates, dict):
+                raise ValueError(
+                    f"Template layer position for {layer_name} must be an object."
+                )
+            if set(coordinates) - set(_TEMPLATE_POSITION_AXES):
+                raise ValueError(
+                    f"Template layer position for {layer_name} has unsupported axes."
+                )
+            clean_coordinates = {}
+            for axis in _TEMPLATE_POSITION_AXES:
+                coordinate = coordinates.get(axis)
+                if (
+                    isinstance(coordinate, bool)
+                    or not isinstance(coordinate, int)
+                    or coordinate < 0
+                    or coordinate > 100
+                ):
+                    raise ValueError(
+                        f"Template layer position {axis} for {layer_name} must be an integer from 0 to 100."
+                    )
+                clean_coordinates[axis] = coordinate
+            clean_positions[layer_name] = clean_coordinates
+        clean["layer_positions"] = clean_positions
 
     if template.get("layout") is not None:
         try:

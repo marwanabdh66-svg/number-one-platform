@@ -237,5 +237,44 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
             )
 
 
+    def test_default_layer_positions_preserve_legacy_svg_layout(self):
+        svg = render_preview_svg(TEMPLATE_CATALOG[0])
+        self.assertIn('x="835" y="260"', svg)
+        self.assertIn('x="835" y="315"', svg)
+        self.assertIn('x="835" y="370"', svg)
+        self.assertIn('x="730" y="445"', svg)
+        self.assertIn('x="230" y="520"', svg)
+
+    def test_custom_layer_positions_move_selected_elements(self):
+        customized = customize_template(
+            TEMPLATE_CATALOG[0],
+            layer_positions={
+                "headline": {"x": 50, "y": 50},
+                "call_to_action": {"x": 25, "y": 25},
+            },
+        )
+        svg = render_preview_svg(customized)
+        self.assertIn('x="668" y="250"', svg)
+        self.assertIn('x="610" y="412"', svg)
+        self.assertEqual(customized["layer_positions"]["subtitle"], {"x": 100, "y": 50})
+
+    def test_layer_positions_reject_unknown_layers_and_out_of_range_values(self):
+        with self.assertRaises(ValueError):
+            customize_template(
+                TEMPLATE_CATALOG[0],
+                layer_positions={"unknown": {"x": 50, "y": 50}},
+            )
+        with self.assertRaises(ValueError):
+            customize_template(
+                TEMPLATE_CATALOG[0],
+                layer_positions={"headline": {"x": 101, "y": 50}},
+            )
+        with self.assertRaises(ValueError):
+            customize_template(
+                TEMPLATE_CATALOG[0],
+                layer_positions={"headline": {"x": True, "y": 50}},
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

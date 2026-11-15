@@ -342,6 +342,23 @@ _LAYER_VISIBILITY_KEYS = (
     "symbol",
 )
 
+# مواضع افتراضية كنسب مئوية داخل مساحة آمنة لكل عنصر، حتى تبقى القوالب القديمة كما هي.
+DEFAULT_LAYER_POSITIONS = {
+    "headline": {"x": 100, "y": 57},
+    "subtitle": {"x": 100, "y": 50},
+    "price": {"x": 100, "y": 50},
+    "call_to_action": {"x": 75, "y": 50},
+    "symbol": {"x": 42, "y": 100},
+}
+
+_LAYER_POSITION_BOUNDS = {
+    "headline": {"x": (500, 835), "y": (180, 320)},
+    "subtitle": {"x": (500, 835), "y": (250, 380)},
+    "price": {"x": (500, 835), "y": (320, 420)},
+    "call_to_action": {"x": (550, 790), "y": (370, 502)},
+    "symbol": {"x": (80, 437), "y": (160, 520)},
+}
+
 
 def _normalize_layer_visibility(value) -> dict:
     """Return safe visibility flags for the editable SVG text layers."""
@@ -358,6 +375,50 @@ def _normalize_layer_visibility(value) -> dict:
     return visibility
 
 
+def _normalize_layer_positions(value) -> dict:
+    """Validate percentage-based positions and fill missing values with legacy defaults."""
+    positions = {
+        name: dict(position)
+        for name, position in DEFAULT_LAYER_POSITIONS.items()
+    }
+    if value is None:
+        return positions
+    if not isinstance(value, dict):
+        raise ValueError("Layer positions must be an object.")
+
+    for layer_name, coordinates in value.items():
+        if layer_name not in DEFAULT_LAYER_POSITIONS:
+            raise ValueError(f"Unknown template layer: {layer_name}.")
+        if not isinstance(coordinates, dict):
+            raise ValueError(f"Layer position for {layer_name} must be an object.")
+        if set(coordinates) - {"x", "y"}:
+            raise ValueError(f"Layer position for {layer_name} has unsupported axes.")
+
+        normalized = {}
+        for axis in ("x", "y"):
+            candidate = coordinates.get(axis, DEFAULT_LAYER_POSITIONS[layer_name][axis])
+            if (
+                isinstance(candidate, bool)
+                or not isinstance(candidate, int)
+                or candidate < 0
+                or candidate > 100
+            ):
+                raise ValueError(
+                    f"Layer position {axis} for {layer_name} must be an integer from 0 to 100."
+                )
+            normalized[axis] = candidate
+        positions[layer_name] = normalized
+
+    return positions
+
+
+def _layer_canvas_coordinate(layer_name: str, axis: str, positions: dict) -> int:
+    """Map a normalized slider value to a safe SVG canvas coordinate."""
+    start, end = _LAYER_POSITION_BOUNDS[layer_name][axis]
+    percentage = positions[layer_name][axis]
+    return int(round(start + (end - start) * percentage / 100))
+
+
 def customize_template(
     template: dict,
     *,
@@ -369,6 +430,7 @@ def customize_template(
     deep=None,
     symbol=None,
     layer_visibility=None,
+    layer_positions=None,
 ) -> dict:
     """Return a safe editable copy of a catalog template without mutating its source."""
     if not isinstance(template, dict):
@@ -408,6 +470,12 @@ def customize_template(
         else result.get("layer_visibility")
     )
     result["layer_visibility"] = _normalize_layer_visibility(visibility_source)
+    position_source = (
+        layer_positions
+        if layer_positions is not None
+        else result.get("layer_positions")
+    )
+    result["layer_positions"] = _normalize_layer_positions(position_source)
     return result
 
 
@@ -428,6 +496,17 @@ def render_preview_svg(template: dict) -> str:
     deep = _safe_template_color(template.get("deep"), "#243B53")
     symbol = escape(str(template.get("symbol") or "✦"))
     layout = int(template["layout"]) % 5
+    layer_positions = _normalize_layer_positions(template.get("layer_positions"))
+    headline_x = _layer_canvas_coordinate("headline", "x", layer_positions)
+    headline_y = _layer_canvas_coordinate("headline", "y", layer_positions)
+    subtitle_x = _layer_canvas_coordinate("subtitle", "x", layer_positions)
+    subtitle_y = _layer_canvas_coordinate("subtitle", "y", layer_positions)
+    price_x = _layer_canvas_coordinate("price", "x", layer_positions)
+    price_y = _layer_canvas_coordinate("price", "y", layer_positions)
+    cta_x = _layer_canvas_coordinate("call_to_action", "x", layer_positions)
+    cta_y = _layer_canvas_coordinate("call_to_action", "y", layer_positions)
+    symbol_x = _layer_canvas_coordinate("symbol", "x", layer_positions)
+    symbol_y = _layer_canvas_coordinate("symbol", "y", layer_positions)
 
     art_by_layout = [
         f"""
@@ -468,24 +547,24 @@ def render_preview_svg(template: dict) -> str:
     layer_visibility = _normalize_layer_visibility(template.get("layer_visibility"))
     accessible_label = title if layer_visibility["headline"] else category
     headline_markup = (
-        f'<text x="835" y="260" fill="#FFFFFF" font-size="43" font-weight="800" text-anchor="end" textLength="360" lengthAdjust="spacingAndGlyphs" font-family="Cairo, Arial, sans-serif" direction="rtl">{title}</text>'
+        f'<text x="{headline_x}" y="{headline_y}" fill="#FFFFFF" font-size="43" font-weight="800" text-anchor="end" textLength="360" lengthAdjust="spacingAndGlyphs" font-family="Cairo, Arial, sans-serif" direction="rtl">{title}</text>'
         if layer_visibility["headline"] else ""
     )
     subtitle_markup = (
-        f'<text x="835" y="315" fill="#C7D2E5" font-size="22" text-anchor="end" textLength="360" lengthAdjust="spacingAndGlyphs" font-family="Cairo, Arial, sans-serif" direction="rtl">{subtitle}</text>'
+        f'<text x="{subtitle_x}" y="{subtitle_y}" fill="#C7D2E5" font-size="22" text-anchor="end" textLength="360" lengthAdjust="spacingAndGlyphs" font-family="Cairo, Arial, sans-serif" direction="rtl">{subtitle}</text>'
         if layer_visibility["subtitle"] else ""
     )
     price_markup = (
-        f'<text x="835" y="370" fill="{accent}" font-size="31" font-weight="800" text-anchor="end" font-family="Cairo, Arial, sans-serif" direction="rtl">{price}</text>'
+        f'<text x="{price_x}" y="{price_y}" fill="{accent}" font-size="31" font-weight="800" text-anchor="end" font-family="Cairo, Arial, sans-serif" direction="rtl">{price}</text>'
         if price and layer_visibility["price"] else ""
     )
     cta_markup = (
-        f'<rect x="625" y="405" width="210" height="62" rx="18" fill="{accent}"/>'
-        f'<text x="730" y="445" fill="#101827" font-size="23" font-weight="800" text-anchor="middle" font-family="Cairo, Arial, sans-serif" direction="rtl">{call_to_action}</text>'
+        f'<rect x="{cta_x - 105}" y="{cta_y - 31}" width="210" height="62" rx="18" fill="{accent}"/>'
+        f'<text x="{cta_x}" y="{cta_y + 9}" fill="#101827" font-size="23" font-weight="800" text-anchor="middle" font-family="Cairo, Arial, sans-serif" direction="rtl">{call_to_action}</text>'
         if layer_visibility["call_to_action"] else ""
     )
     symbol_markup = (
-        f'<text x="230" y="520" fill="{accent}" font-size="64" text-anchor="middle" font-family="Arial, sans-serif">{symbol}</text>'
+        f'<text x="{symbol_x}" y="{symbol_y}" fill="{accent}" font-size="64" text-anchor="middle" font-family="Arial, sans-serif">{symbol}</text>'
         if layer_visibility["symbol"] else ""
     )
 

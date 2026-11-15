@@ -7,7 +7,7 @@ import csv
 import io
 import json
 from datetime import datetime
-from template_catalog import TEMPLATE_CATALOG, PHOTO_PREVIEW_ASSETS, render_preview_data_uri, render_preview_svg, customize_template, get_template_photo_preview, fetch_photo_preview_bytes, search_templates
+from template_catalog import TEMPLATE_CATALOG, PHOTO_PREVIEW_ASSETS, DEFAULT_LAYER_POSITIONS, render_preview_data_uri, render_preview_svg, customize_template, get_template_photo_preview, fetch_photo_preview_bytes, search_templates
 from project_store import initialize_projects_table, save_project, list_projects, format_media_attribution
 from media_library import MediaLibraryError, search_commons_media
 
@@ -100,6 +100,21 @@ def initialize_template_editor_state(template):
         st.session_state[
             template_editor_state_key(template, f"layer_{layer_name}")
         ] = bool(saved_visibility.get(layer_name, True))
+
+    saved_positions = template.get("layer_positions")
+    if not isinstance(saved_positions, dict):
+        saved_positions = {}
+    for layer_name, default_position in DEFAULT_LAYER_POSITIONS.items():
+        position = saved_positions.get(layer_name)
+        if not isinstance(position, dict):
+            position = default_position
+        for axis in ("x", "y"):
+            coordinate = position.get(axis, default_position[axis])
+            if isinstance(coordinate, bool) or not isinstance(coordinate, int) or not 0 <= coordinate <= 100:
+                coordinate = default_position[axis]
+            st.session_state[
+                template_editor_state_key(template, f"position_{layer_name}_{axis}")
+            ] = coordinate
 
 
 def rows_to_csv(rows):
@@ -999,6 +1014,26 @@ elif page == "🤖 صانع الإعلان":
                 bool(saved_visibility.get(layer_name, True)),
             )
 
+        saved_positions = active_template.get("layer_positions")
+        if not isinstance(saved_positions, dict):
+            saved_positions = {}
+        for layer_name, default_position in DEFAULT_LAYER_POSITIONS.items():
+            position = saved_positions.get(layer_name)
+            if not isinstance(position, dict):
+                position = default_position
+            for axis in ("x", "y"):
+                state_key = template_editor_state_key(
+                    active_template, f"position_{layer_name}_{axis}"
+                )
+                coordinate = position.get(axis, default_position[axis])
+                if (
+                    isinstance(coordinate, bool)
+                    or not isinstance(coordinate, int)
+                    or not 0 <= coordinate <= 100
+                ):
+                    coordinate = default_position[axis]
+                st.session_state.setdefault(state_key, coordinate)
+
         with st.expander("فتح أدوات تعديل القالب", expanded=True):
             edit_col1, edit_col2 = st.columns(2)
             with edit_col1:
@@ -1062,12 +1097,65 @@ elif page == "🤖 صانع الإعلان":
                     key=template_editor_state_key(active_template, "layer_symbol"),
                 )
 
+            st.markdown("#### تحريك مواضع عناصر التصميم")
+            position_labels = {
+                "headline": "العنوان الرئيسي",
+                "subtitle": "النص المساعد",
+                "price": "السعر أو العرض",
+                "call_to_action": "زر الدعوة للإجراء",
+                "symbol": "الرمز أو الأيقونة",
+            }
+            selected_position_layer = st.selectbox(
+                "اختر العنصر الذي تريد تحريكه",
+                options=list(DEFAULT_LAYER_POSITIONS),
+                format_func=lambda layer_name: position_labels[layer_name],
+                key=template_editor_state_key(active_template, "position_layer"),
+            )
+            position_col1, position_col2 = st.columns(2)
+            with position_col1:
+                edited_position_x = st.slider(
+                    "الموضع الأفقي",
+                    min_value=0,
+                    max_value=100,
+                    step=1,
+                    key=template_editor_state_key(
+                        active_template, f"position_{selected_position_layer}_x"
+                    ),
+                    help="حرّك العنصر أفقيًا داخل المساحة الآمنة للقالب.",
+                )
+            with position_col2:
+                edited_position_y = st.slider(
+                    "الموضع العمودي",
+                    min_value=0,
+                    max_value=100,
+                    step=1,
+                    key=template_editor_state_key(
+                        active_template, f"position_{selected_position_layer}_y"
+                    ),
+                    help="حرّك العنصر عموديًا داخل المساحة الآمنة للقالب.",
+                )
+
         edited_layer_visibility = {
             "headline": show_headline,
             "subtitle": show_subtitle,
             "price": show_price,
             "call_to_action": show_cta,
             "symbol": show_symbol,
+        }
+        edited_layer_positions = {
+            layer_name: {
+                "x": int(st.session_state[
+                    template_editor_state_key(active_template, f"position_{layer_name}_x")
+                ]),
+                "y": int(st.session_state[
+                    template_editor_state_key(active_template, f"position_{layer_name}_y")
+                ]),
+            }
+            for layer_name in DEFAULT_LAYER_POSITIONS
+        }
+        edited_layer_positions[selected_position_layer] = {
+            "x": edited_position_x,
+            "y": edited_position_y,
         }
         edited_template = customize_template(
             active_template,
@@ -1079,6 +1167,7 @@ elif page == "🤖 صانع الإعلان":
             deep=edited_deep,
             symbol=edited_symbol,
             layer_visibility=edited_layer_visibility,
+            layer_positions=edited_layer_positions,
         )
         st.session_state["selected_template"] = edited_template
 
@@ -1120,8 +1209,8 @@ elif page == "🤖 صانع الإعلان":
             else:
                 st.info("هذا القالب يستخدم معاينة SVG أصلية ولا يرتبط بصورة فوتوغرافية محددة.")
         st.caption(
-            "يمكنك الآن إظهار أو إخفاء العنوان والنص والسعر والزر والرمز كلٌّ على حدة. "
-            "تُحفظ حالة هذه العناصر مع القالب؛ أما تحريك الطبقات وتغيير مواضعها وتصدير PNG فلم يُفعّل بعد."
+            "يمكنك إظهار أو إخفاء كل عنصر وتحريك العنصر المحدد أفقيًا وعموديًا باستخدام أشرطة التحكم. "
+            "تُحفظ المواضع مع بيانات القالب؛ السحب المباشر باللمس وتصدير PNG ما زالا قيد التطوير."
         )
 
     selected_media_asset = st.session_state.get("selected_media_asset")

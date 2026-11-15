@@ -289,5 +289,36 @@ class ProjectStoreMediaTests(unittest.TestCase):
             )
 
 
+    def test_project_preserves_layer_positions(self):
+        template = self.sample_template()
+        template["layer_positions"] = {
+            "headline": {"x": 35, "y": 42},
+            "call_to_action": {"x": 70, "y": 65},
+        }
+        save_project(
+            self.connection,
+            username="user-a",
+            title="Positioned template",
+            prompt="Ad prompt",
+            template=template,
+        )
+        saved = json.loads(list_projects(self.connection, "user-a")[0]["template_json"])
+        self.assertEqual(saved["layer_positions"], template["layer_positions"])
+
+    def test_project_rejects_invalid_layer_positions(self):
+        template = self.sample_template()
+        template["layer_positions"] = {
+            "headline": {"x": 101, "y": 50},
+        }
+        with self.assertRaises(ValueError):
+            save_project(
+                self.connection,
+                username="user-a",
+                title="Invalid layer position",
+                prompt="Ad prompt",
+                template=template,
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
