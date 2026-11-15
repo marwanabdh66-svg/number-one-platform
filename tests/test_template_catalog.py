@@ -238,7 +238,9 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
 
 
     def test_default_layer_positions_preserve_legacy_svg_layout(self):
-        svg = render_preview_svg(TEMPLATE_CATALOG[0])
+        template = dict(TEMPLATE_CATALOG[0])
+        template["price"] = "سعر تجريبي"
+        svg = render_preview_svg(template)
         self.assertIn('x="835" y="260"', svg)
         self.assertIn('x="835" y="315"', svg)
         self.assertIn('x="835" y="370"', svg)
