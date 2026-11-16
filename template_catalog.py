@@ -491,9 +491,9 @@ def _photo_layer_markup(photo_bytes: bytes | None) -> str:
     if not payload or len(payload) > 900_000:
         return ""
 
-    if payload.startswith(b"\\xff\\xd8\\xff"):
+    if payload.startswith(b"\xff\xd8\xff"):
         mime = "image/jpeg"
-    elif payload.startswith(b"\\x89PNG\\r\\n\\x1a\\n"):
+    elif payload.startswith(b"\x89PNG\r\n\x1a\n"):
         mime = "image/png"
     elif len(payload) >= 12 and payload[:4] == b"RIFF" and payload[8:12] == b"WEBP":
         mime = "image/webp"
