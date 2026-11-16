@@ -1174,7 +1174,19 @@ elif page == "🤖 صانع الإعلان":
         preview_col, reference_col = st.columns([2, 1])
         with preview_col:
             st.markdown("#### معاينة التصميم بعد التعديل")
-            preview_uri = render_preview_data_uri(edited_template)
+            selected_media_for_editor = st.session_state.get("selected_media_asset")
+            editor_photo_bytes = None
+            if (
+                isinstance(selected_media_for_editor, dict)
+                and selected_media_for_editor.get("media_type") == "image"
+            ):
+                editor_photo_bytes = cached_template_photo(
+                    selected_media_for_editor.get("preview_url") or ""
+                )
+            preview_uri = render_preview_data_uri(
+                edited_template,
+                photo_bytes=editor_photo_bytes,
+            )
             safe_preview_title = html.escape(str(edited_template.get("headline", "قالب NUMBER ONE")))
             st.markdown(
                 f'<img src="{preview_uri}" alt="{safe_preview_title}" '
@@ -1183,12 +1195,22 @@ elif page == "🤖 صانع الإعلان":
             )
             st.download_button(
                 "تنزيل معاينة التصميم SVG",
-                data=render_preview_svg(edited_template),
+                data=render_preview_svg(edited_template, photo_bytes=editor_photo_bytes),
                 file_name="number_one_template.svg",
                 mime="image/svg+xml",
                 key=f"download_edited_template_{edited_template.get('id', 'selected')}",
                 use_container_width=True,
             )
+            if selected_media_for_editor and selected_media_for_editor.get("media_type") == "image":
+                if editor_photo_bytes:
+                    st.caption(
+                        "أُدرجت الصورة المختارة من مكتبة الوسائط كطبقة داخل معاينة SVG. "
+                        "بيانات المصدر والترخيص محفوظة منفصلة مع المشروع."
+                    )
+                else:
+                    st.caption(
+                        "تعذر إدراج الصورة في المعاينة الآن؛ سيظل ملف الوسائط ومصدره محفوظين مع المشروع."
+                    )
         with reference_col:
             photo_reference = edited_template.get("photo_preview")
             if photo_reference:
@@ -1550,7 +1572,22 @@ elif page == "👤 حسابي":
                         except (TypeError, ValueError):
                             st.warning("تعذر قراءة بيانات القالب المحفوظ لهذا المشروع.")
 
+                    saved_media = None
+                    if project["media_json"]:
+                        try:
+                            saved_media = json.loads(project["media_json"])
+                        except (TypeError, ValueError):
+                            st.warning("تعذر قراءة بيانات الوسيط المحفوظ لهذا المشروع.")
+
                     if saved_template:
+                        saved_photo_bytes = None
+                        if (
+                            isinstance(saved_media, dict)
+                            and saved_media.get("media_type") == "image"
+                        ):
+                            saved_photo_bytes = cached_template_photo(
+                                saved_media.get("preview_url") or ""
+                            )
                         st.markdown("#### بيانات القالب المحفوظة")
                         st.caption(
                             f"{saved_template.get('title', 'قالب')} · "
@@ -1558,7 +1595,10 @@ elif page == "👤 حسابي":
                             f"{saved_template.get('format', '')} · "
                             f"{saved_template.get('style', '')}"
                         )
-                        saved_preview_uri = render_preview_data_uri(saved_template)
+                        saved_preview_uri = render_preview_data_uri(
+                            saved_template,
+                            photo_bytes=saved_photo_bytes,
+                        )
                         st.markdown(
                             f'<img src="{saved_preview_uri}" alt="معاينة المشروع المحفوظ" '
                             'style="display:block;width:100%;max-width:720px;height:auto;border-radius:12px">',
@@ -1566,7 +1606,7 @@ elif page == "👤 حسابي":
                         )
                         st.download_button(
                             "تنزيل معاينة القالب المحفوظ SVG",
-                            data=render_preview_svg(saved_template),
+                            data=render_preview_svg(saved_template, photo_bytes=saved_photo_bytes),
                             file_name=f"number_one_project_{project['id']}.svg",
                             mime="image/svg+xml",
                             key=f"download_saved_template_{project['id']}",
@@ -1590,6 +1630,10 @@ elif page == "👤 حسابي":
                             use_container_width=True,
                         ):
                             st.session_state["selected_template"] = saved_template
+                            if saved_media:
+                                st.session_state["selected_media_asset"] = saved_media
+                            else:
+                                st.session_state.pop("selected_media_asset", None)
                             initialize_template_editor_state(saved_template)
                             st.session_state["selected_template_id"] = saved_template["id"]
                             st.session_state["template"] = saved_template["title"]
@@ -1600,13 +1644,6 @@ elif page == "👤 حسابي":
                             st.session_state["template_navigation_pending"] = True
                             st.session_state.pop("prompt", None)
                             st.rerun()
-
-                    saved_media = None
-                    if project["media_json"]:
-                        try:
-                            saved_media = json.loads(project["media_json"])
-                        except (TypeError, ValueError):
-                            st.warning("تعذر قراءة بيانات الوسيط المحفوظ لهذا المشروع.")
 
                     if saved_media:
                         st.markdown("#### الوسيط والترخيص المحفوظان")
