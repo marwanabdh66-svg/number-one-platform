@@ -479,8 +479,42 @@ def customize_template(
     return result
 
 
-def render_preview_svg(template: dict) -> str:
-    """Return an original, lightweight SVG preview for a catalog item."""
+def _photo_layer_markup(photo_bytes: bytes | None) -> str:
+    """Embed a small JPEG/PNG/WebP as a local SVG image layer.
+
+    Only raster signatures are accepted; SVG/XML payloads are deliberately
+    rejected to prevent active markup from entering the exported document.
+    """
+    if not isinstance(photo_bytes, (bytes, bytearray)):
+        return ""
+    payload = bytes(photo_bytes)
+    if not payload or len(payload) > 900_000:
+        return ""
+
+    if payload.startswith(b"\\xff\\xd8\\xff"):
+        mime = "image/jpeg"
+    elif payload.startswith(b"\\x89PNG\\r\\n\\x1a\\n"):
+        mime = "image/png"
+    elif len(payload) >= 12 and payload[:4] == b"RIFF" and payload[8:12] == b"WEBP":
+        mime = "image/webp"
+    else:
+        return ""
+
+    encoded = base64.b64encode(payload).decode("ascii")
+    return (
+        '<defs><clipPath id="mediaPhotoClip">'
+        '<rect x="58" y="142" width="360" height="340" rx="20"/>'
+        '</clipPath></defs>'
+        f'<image href="data:{mime};base64,{encoded}" '
+        'x="58" y="142" width="360" height="340" '
+        'preserveAspectRatio="xMidYMid slice" '
+        'clip-path="url(#mediaPhotoClip)" '
+        'aria-label="صورة مضافة من مكتبة الوسائط"/>'
+    )
+
+
+def render_preview_svg(template: dict, photo_bytes: bytes | None = None) -> str:
+    """Return an original SVG preview, optionally with a safe raster image layer."""
     raw_format = str(template["format"])
     raw_style = str(template["style"])
     title = escape(str(template.get("headline") or template["topic"]))
@@ -544,6 +578,7 @@ def render_preview_svg(template: dict) -> str:
         """,
     ]
     art = art_by_layout[layout]
+    photo_markup = _photo_layer_markup(photo_bytes)
     layer_visibility = _normalize_layer_visibility(template.get("layer_visibility"))
     accessible_label = title if layer_visibility["headline"] else category
     headline_markup = (
@@ -585,6 +620,7 @@ def render_preview_svg(template: dict) -> str:
       <circle cx="70" cy="540" r="130" fill="{accent}" opacity=".06"/>
       <rect x="42" y="42" width="400" height="516" rx="24" fill="url(#panel)" opacity=".9"/>
       {art}
+      {photo_markup}
       <text x="835" y="90" fill="{accent}" font-size="25" font-weight="800" text-anchor="end" font-family="Cairo, Arial, sans-serif">NUMBER ONE</text>
       <text x="835" y="142" fill="#C7D2E5" font-size="19" text-anchor="end" font-family="Cairo, Arial, sans-serif" direction="rtl">{category}</text>
       {headline_markup}
@@ -596,8 +632,11 @@ def render_preview_svg(template: dict) -> str:
     </svg>"""
 
 
-def render_preview_data_uri(template: dict) -> str:
-    """Return a data URI so Streamlit can display the SVG without extra packages."""
-    svg = render_preview_svg(template)
+def render_preview_data_uri(
+    template: dict,
+    photo_bytes: bytes | None = None,
+) -> str:
+    """Return a data URI for the SVG preview, including an optional photo layer."""
+    svg = render_preview_svg(template, photo_bytes=photo_bytes)
     encoded = base64.b64encode(svg.encode("utf-8")).decode("ascii")
     return f"data:image/svg+xml;base64,{encoded}"
