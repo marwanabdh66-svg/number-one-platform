@@ -279,7 +279,7 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
 
 
     def test_renderer_embeds_supported_jpeg_as_a_separate_image_layer(self):
-        photo_bytes = b"\\xff\\xd8\\xff\\xe0sample-jpeg-data"
+        photo_bytes = b"\xff\xd8\xff\xe0sample-jpeg-data"
         svg = render_preview_svg(TEMPLATE_CATALOG[0], photo_bytes=photo_bytes)
 
         self.assertIn('<image href="data:image/jpeg;base64,', svg)
@@ -294,7 +294,7 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
         )
         oversized_png = render_preview_svg(
             TEMPLATE_CATALOG[0],
-            photo_bytes=b"\\x89PNG\\r\\n\\x1a\\n" + (b"x" * 900_001),
+            photo_bytes=b"\x89PNG\r\n\x1a\n" + (b"x" * 900_001),
         )
 
         self.assertNotIn("<image href=", unsupported_svg)
@@ -302,7 +302,7 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
         self.assertNotIn("data:image/svg+xml;base64,", unsupported_svg)
 
     def test_data_uri_preserves_embedded_image_layer(self):
-        photo_bytes = b"\\x89PNG\\r\\n\\x1a\\nsmall-png-data"
+        photo_bytes = b"\x89PNG\r\n\x1a\nsmall-png-data"
         data_uri = render_preview_data_uri(
             TEMPLATE_CATALOG[0],
             photo_bytes=photo_bytes,
