@@ -278,5 +278,40 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
             )
 
 
+    def test_renderer_embeds_supported_jpeg_as_a_separate_image_layer(self):
+        photo_bytes = b"\\xff\\xd8\\xff\\xe0sample-jpeg-data"
+        svg = render_preview_svg(TEMPLATE_CATALOG[0], photo_bytes=photo_bytes)
+
+        self.assertIn('<image href="data:image/jpeg;base64,', svg)
+        self.assertIn('clip-path="url(#mediaPhotoClip)"', svg)
+        self.assertIn('x="58" y="142" width="360" height="340"', svg)
+        self.assertIn('aria-label="صورة مضافة من مكتبة الوسائط"', svg)
+
+    def test_renderer_ignores_unsupported_or_oversized_photo_payloads(self):
+        unsupported_svg = render_preview_svg(
+            TEMPLATE_CATALOG[0],
+            photo_bytes=b"<svg xmlns='http://www.w3.org/2000/svg'></svg>",
+        )
+        oversized_png = render_preview_svg(
+            TEMPLATE_CATALOG[0],
+            photo_bytes=b"\\x89PNG\\r\\n\\x1a\\n" + (b"x" * 900_001),
+        )
+
+        self.assertNotIn("<image href=", unsupported_svg)
+        self.assertNotIn("<image href=", oversized_png)
+        self.assertNotIn("data:image/svg+xml;base64,", unsupported_svg)
+
+    def test_data_uri_preserves_embedded_image_layer(self):
+        photo_bytes = b"\\x89PNG\\r\\n\\x1a\\nsmall-png-data"
+        data_uri = render_preview_data_uri(
+            TEMPLATE_CATALOG[0],
+            photo_bytes=photo_bytes,
+        )
+        svg = base64.b64decode(data_uri.split(",", 1)[1]).decode("utf-8")
+
+        self.assertTrue(data_uri.startswith("data:image/svg+xml;base64,"))
+        self.assertIn('href="data:image/png;base64,', svg)
+
+
 if __name__ == "__main__":
     unittest.main()
