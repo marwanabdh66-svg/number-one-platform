@@ -320,5 +320,46 @@ class ProjectStoreMediaTests(unittest.TestCase):
             )
 
 
+    def test_project_preserves_image_layer_visibility_position_and_size(self):
+        template = self.sample_template()
+        template["image_layer"] = {
+            "visible": False,
+            "x": 18,
+            "y": 22,
+            "width": 55,
+            "height": 46,
+        }
+        save_project(
+            self.connection,
+            username="user-a",
+            title="Image layer campaign",
+            prompt="Ad prompt",
+            template=template,
+        )
+        saved = json.loads(list_projects(self.connection, "user-a")[0]["template_json"])
+        self.assertEqual(saved["image_layer"], template["image_layer"])
+
+    def test_project_rejects_invalid_image_layer_settings(self):
+        invalid_layers = [
+            {"visible": "no"},
+            {"x": True},
+            {"width": 9},
+            {"height": 81},
+            {"opacity": 50},
+        ]
+        for image_layer in invalid_layers:
+            with self.subTest(image_layer=image_layer):
+                template = self.sample_template()
+                template["image_layer"] = image_layer
+                with self.assertRaises(ValueError):
+                    save_project(
+                        self.connection,
+                        username="user-a",
+                        title="Invalid image layer",
+                        prompt="Ad prompt",
+                        template=template,
+                    )
+
+
 if __name__ == "__main__":
     unittest.main()
