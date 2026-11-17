@@ -284,8 +284,60 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
 
         self.assertIn('<image href="data:image/jpeg;base64,', svg)
         self.assertIn('clip-path="url(#mediaPhotoClip)"', svg)
-        self.assertIn('x="58" y="142" width="360" height="340"', svg)
+        self.assertIn('x="54" y="144" width="360" height="342"', svg)
         self.assertIn('aria-label="صورة مضافة من مكتبة الوسائط"', svg)
+
+    def test_photo_layer_position_and_size_are_editable(self):
+        photo_bytes = b"\xff\xd8\xff\xe0sample-jpeg-data"
+        customized = customize_template(
+            TEMPLATE_CATALOG[0],
+            image_layer={
+                "visible": True,
+                "x": 20,
+                "y": 10,
+                "width": 50,
+                "height": 30,
+            },
+        )
+        svg = render_preview_svg(customized, photo_bytes=photo_bytes)
+
+        self.assertIn('x="180" y="60" width="450" height="180"', svg)
+        self.assertEqual(
+            customized["image_layer"],
+            {"visible": True, "x": 20, "y": 10, "width": 50, "height": 30},
+        )
+
+    def test_photo_layer_can_be_hidden_without_removing_its_settings(self):
+        photo_bytes = b"\xff\xd8\xff\xe0sample-jpeg-data"
+        customized = customize_template(
+            TEMPLATE_CATALOG[0],
+            image_layer={
+                "visible": False,
+                "x": 12,
+                "y": 18,
+                "width": 35,
+                "height": 42,
+            },
+        )
+        svg = render_preview_svg(customized, photo_bytes=photo_bytes)
+
+        self.assertNotIn("<image href=", svg)
+        self.assertFalse(customized["image_layer"]["visible"])
+        self.assertEqual(customized["image_layer"]["x"], 12)
+
+    def test_image_layer_rejects_invalid_settings(self):
+        invalid_settings = [
+            {"unknown": 1},
+            {"visible": "false"},
+            {"x": True},
+            {"width": 9},
+            {"height": 81},
+        ]
+        for settings in invalid_settings:
+            with self.subTest(settings=settings):
+                with self.assertRaises(ValueError):
+                    customize_template(TEMPLATE_CATALOG[0], image_layer=settings)
+
 
     def test_renderer_ignores_unsupported_or_oversized_photo_payloads(self):
         unsupported_svg = render_preview_svg(
