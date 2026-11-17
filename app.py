@@ -7,7 +7,7 @@ import csv
 import io
 import json
 from datetime import datetime
-from template_catalog import TEMPLATE_CATALOG, PHOTO_PREVIEW_ASSETS, DEFAULT_LAYER_POSITIONS, render_preview_data_uri, render_preview_svg, customize_template, get_template_photo_preview, fetch_photo_preview_bytes, search_templates
+from template_catalog import TEMPLATE_CATALOG, PHOTO_PREVIEW_ASSETS, DEFAULT_LAYER_POSITIONS, DEFAULT_IMAGE_LAYER, normalize_image_layer, render_preview_data_uri, render_preview_svg, customize_template, get_template_photo_preview, fetch_photo_preview_bytes, search_templates
 from project_store import initialize_projects_table, save_project, list_projects, format_media_attribution
 from media_library import MediaLibraryError, search_commons_media
 
@@ -115,6 +115,12 @@ def initialize_template_editor_state(template):
             st.session_state[
                 template_editor_state_key(template, f"position_{layer_name}_{axis}")
             ] = coordinate
+    saved_image_layer = normalize_image_layer(template.get("image_layer"))
+    for field, value in saved_image_layer.items():
+        st.session_state[
+            template_editor_state_key(template, f"image_{field}")
+        ] = value
+
 
 
 def rows_to_csv(rows):
@@ -1034,6 +1040,13 @@ elif page == "🤖 صانع الإعلان":
                     coordinate = default_position[axis]
                 st.session_state.setdefault(state_key, coordinate)
 
+        saved_image_layer = normalize_image_layer(active_template.get("image_layer"))
+        for field, value in saved_image_layer.items():
+            st.session_state.setdefault(
+                template_editor_state_key(active_template, f"image_{field}"),
+                value,
+            )
+
         with st.expander("فتح أدوات تعديل القالب", expanded=True):
             edit_col1, edit_col2 = st.columns(2)
             with edit_col1:
@@ -1135,6 +1148,49 @@ elif page == "🤖 صانع الإعلان":
                     help="حرّك العنصر عموديًا داخل المساحة الآمنة للقالب.",
                 )
 
+            st.markdown("#### التحكم في طبقة الصورة")
+            current_media = st.session_state.get("selected_media_asset")
+            if not (
+                isinstance(current_media, dict)
+                and current_media.get("media_type") == "image"
+            ):
+                st.caption("اختر صورة من «مكتبة الوسائط» لإظهارها داخل القالب.")
+            image_col1, image_col2 = st.columns(2)
+            with image_col1:
+                show_editor_image = st.checkbox(
+                    "إظهار الصورة داخل التصميم",
+                    key=template_editor_state_key(active_template, "image_visible"),
+                )
+                edited_image_x = st.slider(
+                    "موضع الصورة أفقيًا",
+                    min_value=0,
+                    max_value=100,
+                    step=1,
+                    key=template_editor_state_key(active_template, "image_x"),
+                )
+                edited_image_width = st.slider(
+                    "عرض الصورة",
+                    min_value=10,
+                    max_value=80,
+                    step=1,
+                    key=template_editor_state_key(active_template, "image_width"),
+                )
+            with image_col2:
+                edited_image_y = st.slider(
+                    "موضع الصورة عموديًا",
+                    min_value=0,
+                    max_value=100,
+                    step=1,
+                    key=template_editor_state_key(active_template, "image_y"),
+                )
+                edited_image_height = st.slider(
+                    "ارتفاع الصورة",
+                    min_value=10,
+                    max_value=80,
+                    step=1,
+                    key=template_editor_state_key(active_template, "image_height"),
+                )
+
         edited_layer_visibility = {
             "headline": show_headline,
             "subtitle": show_subtitle,
@@ -1157,6 +1213,13 @@ elif page == "🤖 صانع الإعلان":
             "x": edited_position_x,
             "y": edited_position_y,
         }
+        edited_image_layer = {
+            "visible": show_editor_image,
+            "x": edited_image_x,
+            "y": edited_image_y,
+            "width": edited_image_width,
+            "height": edited_image_height,
+        }
         edited_template = customize_template(
             active_template,
             headline=edited_headline,
@@ -1168,6 +1231,7 @@ elif page == "🤖 صانع الإعلان":
             symbol=edited_symbol,
             layer_visibility=edited_layer_visibility,
             layer_positions=edited_layer_positions,
+            image_layer=edited_image_layer,
         )
         st.session_state["selected_template"] = edited_template
 
@@ -1231,8 +1295,8 @@ elif page == "🤖 صانع الإعلان":
             else:
                 st.info("هذا القالب يستخدم معاينة SVG أصلية ولا يرتبط بصورة فوتوغرافية محددة.")
         st.caption(
-            "يمكنك إظهار أو إخفاء كل عنصر وتحريك العنصر المحدد أفقيًا وعموديًا باستخدام أشرطة التحكم. "
-            "تُحفظ المواضع مع بيانات القالب؛ السحب المباشر باللمس وتصدير PNG ما زالا قيد التطوير."
+            "يمكنك تعديل النصوص وتحريكها، وإظهار الصورة أو إخفاءها وتغيير موضعها وحجمها. "
+            "تُحفظ إعدادات طبقة الصورة مع المشروع؛ السحب المباشر باللمس وتصدير PNG ما زالا قيد التطوير."
         )
 
     selected_media_asset = st.session_state.get("selected_media_asset")
