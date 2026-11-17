@@ -351,6 +351,21 @@ DEFAULT_LAYER_POSITIONS = {
     "symbol": {"x": 42, "y": 100},
 }
 
+# إعدادات طبقة الصورة كنسب من مساحة SVG (900 × 600).
+DEFAULT_IMAGE_LAYER = {
+    "visible": True,
+    "x": 6,
+    "y": 24,
+    "width": 40,
+    "height": 57,
+}
+_IMAGE_LAYER_BOUNDS = {
+    "x": (0, 100),
+    "y": (0, 100),
+    "width": (10, 80),
+    "height": (10, 80),
+}
+
 _LAYER_POSITION_BOUNDS = {
     "headline": {"x": (500, 835), "y": (180, 320)},
     "subtitle": {"x": (500, 835), "y": (250, 380)},
@@ -419,6 +434,37 @@ def _layer_canvas_coordinate(layer_name: str, axis: str, positions: dict) -> int
     return int(round(start + (end - start) * percentage / 100))
 
 
+def normalize_image_layer(value=None) -> dict:
+    """Validate image visibility, position, and size as bounded percentages."""
+    layer = dict(DEFAULT_IMAGE_LAYER)
+    if value is None:
+        return layer
+    if not isinstance(value, dict):
+        raise ValueError("Image layer settings must be an object.")
+    unknown = set(value) - set(DEFAULT_IMAGE_LAYER)
+    if unknown:
+        raise ValueError("Image layer settings contain unsupported fields.")
+
+    visible = value.get("visible", layer["visible"])
+    if not isinstance(visible, bool):
+        raise ValueError("Image layer visibility must be boolean.")
+    layer["visible"] = visible
+
+    for field, (minimum, maximum) in _IMAGE_LAYER_BOUNDS.items():
+        candidate = value.get(field, layer[field])
+        if (
+            isinstance(candidate, bool)
+            or not isinstance(candidate, int)
+            or candidate < minimum
+            or candidate > maximum
+        ):
+            raise ValueError(
+                f"Image layer {field} must be an integer from {minimum} to {maximum}."
+            )
+        layer[field] = candidate
+    return layer
+
+
 def customize_template(
     template: dict,
     *,
@@ -431,6 +477,7 @@ def customize_template(
     symbol=None,
     layer_visibility=None,
     layer_positions=None,
+    image_layer=None,
 ) -> dict:
     """Return a safe editable copy of a catalog template without mutating its source."""
     if not isinstance(template, dict):
@@ -476,19 +523,26 @@ def customize_template(
         else result.get("layer_positions")
     )
     result["layer_positions"] = _normalize_layer_positions(position_source)
+    image_layer_source = (
+        image_layer if image_layer is not None else result.get("image_layer")
+    )
+    result["image_layer"] = normalize_image_layer(image_layer_source)
     return result
 
 
-def _photo_layer_markup(photo_bytes: bytes | None) -> str:
-    """Embed a small JPEG/PNG/WebP as a local SVG image layer.
-
-    Only raster signatures are accepted; SVG/XML payloads are deliberately
-    rejected to prevent active markup from entering the exported document.
-    """
+def _photo_layer_markup(
+    photo_bytes: bytes | None,
+    image_layer=None,
+) -> str:
+    """Embed a bounded raster image as an independently positioned SVG layer."""
     if not isinstance(photo_bytes, (bytes, bytearray)):
         return ""
     payload = bytes(photo_bytes)
     if not payload or len(payload) > 900_000:
+        return ""
+
+    layer = normalize_image_layer(image_layer)
+    if not layer["visible"]:
         return ""
 
     if payload.startswith(b"\xff\xd8\xff"):
@@ -500,13 +554,17 @@ def _photo_layer_markup(photo_bytes: bytes | None) -> str:
     else:
         return ""
 
+    x = int(round(900 * layer["x"] / 100))
+    y = int(round(600 * layer["y"] / 100))
+    width = int(round(900 * layer["width"] / 100))
+    height = int(round(600 * layer["height"] / 100))
     encoded = base64.b64encode(payload).decode("ascii")
     return (
         '<defs><clipPath id="mediaPhotoClip">'
-        '<rect x="58" y="142" width="360" height="340" rx="20"/>'
+        f'<rect x="{x}" y="{y}" width="{width}" height="{height}" rx="20"/>'
         '</clipPath></defs>'
         f'<image href="data:{mime};base64,{encoded}" '
-        'x="58" y="142" width="360" height="340" '
+        f'x="{x}" y="{y}" width="{width}" height="{height}" '
         'preserveAspectRatio="xMidYMid slice" '
         'clip-path="url(#mediaPhotoClip)" '
         'aria-label="صورة مضافة من مكتبة الوسائط"/>'
@@ -578,7 +636,7 @@ def render_preview_svg(template: dict, photo_bytes: bytes | None = None) -> str:
         """,
     ]
     art = art_by_layout[layout]
-    photo_markup = _photo_layer_markup(photo_bytes)
+    photo_markup = _photo_layer_markup(photo_bytes, template.get("image_layer"))
     layer_visibility = _normalize_layer_visibility(template.get("layer_visibility"))
     accessible_label = title if layer_visibility["headline"] else category
     headline_markup = (
