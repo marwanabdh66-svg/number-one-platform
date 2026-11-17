@@ -73,6 +73,19 @@ _TEMPLATE_LAYER_KEYS = (
     "headline", "subtitle", "price", "call_to_action", "symbol",
 )
 _TEMPLATE_POSITION_AXES = ("x", "y")
+_TEMPLATE_IMAGE_LAYER_DEFAULTS = {
+    "visible": True,
+    "x": 6,
+    "y": 24,
+    "width": 40,
+    "height": 57,
+}
+_TEMPLATE_IMAGE_LAYER_BOUNDS = {
+    "x": (0, 100),
+    "y": (0, 100),
+    "width": (10, 80),
+    "height": (10, 80),
+}
 
 
 def _serialize_template_photo(photo):
@@ -190,6 +203,33 @@ def _serialize_template_metadata(template):
                 clean_coordinates[axis] = coordinate
             clean_positions[layer_name] = clean_coordinates
         clean["layer_positions"] = clean_positions
+
+    image_layer = template.get("image_layer")
+    if image_layer is not None:
+        if not isinstance(image_layer, dict):
+            raise ValueError("Template image layer must be an object.")
+        if set(image_layer) - set(_TEMPLATE_IMAGE_LAYER_DEFAULTS):
+            raise ValueError("Template image layer has unsupported fields.")
+
+        clean_image_layer = {}
+        visible = image_layer.get("visible", True)
+        if not isinstance(visible, bool):
+            raise ValueError("Template image layer visibility must be boolean.")
+        clean_image_layer["visible"] = visible
+
+        for field, (minimum, maximum) in _TEMPLATE_IMAGE_LAYER_BOUNDS.items():
+            value = image_layer.get(field, _TEMPLATE_IMAGE_LAYER_DEFAULTS[field])
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or value < minimum
+                or value > maximum
+            ):
+                raise ValueError(
+                    f"Template image layer {field} must be an integer from {minimum} to {maximum}."
+                )
+            clean_image_layer[field] = value
+        clean["image_layer"] = clean_image_layer
 
     if template.get("layout") is not None:
         try:
