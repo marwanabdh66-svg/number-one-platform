@@ -12,6 +12,7 @@ from template_catalog import (
     customize_template,
     render_preview_svg,
     render_preview_data_uri,
+    template_page_state_key,
 )
 
 
@@ -40,6 +41,34 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
             format_name=chosen["format"],
         )
         self.assertEqual(results, [chosen])
+
+    def test_template_page_key_is_stable_and_includes_page_size(self):
+        results = [{"id": "NO-0001"}, {"id": "NO-0002"}]
+        self.assertEqual(
+            template_page_state_key(results, 9),
+            template_page_state_key(list(results), 9),
+        )
+        self.assertNotEqual(
+            template_page_state_key(results, 9),
+            template_page_state_key(results, 6),
+        )
+
+    def test_template_page_key_resets_for_same_count_different_results(self):
+        first_results = [{"id": "NO-0001"}, {"id": "NO-0002"}]
+        second_results = [{"id": "NO-0101"}, {"id": "NO-0102"}]
+        self.assertEqual(len(first_results), len(second_results))
+        self.assertNotEqual(
+            template_page_state_key(first_results, 9),
+            template_page_state_key(second_results, 9),
+        )
+
+    def test_template_page_key_rejects_invalid_page_size_or_entries(selfself):
+        for invalid_size in (0, -1, True, 1.5):
+            with self.subTest(page_size=invalid_size):
+                with self.assertRaises(ValueError):
+                    template_page_state_key([], invalid_size)
+        with self.assertRaises(ValueError):
+            template_page_state_key([None], 9)
 
     def test_curated_photo_sources_have_license_and_attribution_metadata(self):
         self.assertEqual(len(PHOTO_PREVIEW_ASSETS), 8)

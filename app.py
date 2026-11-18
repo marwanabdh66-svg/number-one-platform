@@ -7,7 +7,7 @@ import csv
 import io
 import json
 from datetime import datetime
-from template_catalog import TEMPLATE_CATALOG, PHOTO_PREVIEW_ASSETS, DEFAULT_LAYER_POSITIONS, DEFAULT_IMAGE_LAYER, normalize_image_layer, render_preview_data_uri, render_preview_svg, customize_template, get_template_photo_preview, fetch_photo_preview_bytes, search_templates
+from template_catalog import TEMPLATE_CATALOG, PHOTO_PREVIEW_ASSETS, DEFAULT_LAYER_POSITIONS, DEFAULT_IMAGE_LAYER, normalize_image_layer, render_preview_data_uri, render_preview_svg, customize_template, get_template_photo_preview, fetch_photo_preview_bytes, search_templates, template_page_state_key
 from project_store import initialize_projects_table, save_project, list_projects, format_media_attribution
 from media_library import MediaLibraryError, search_commons_media
 
@@ -707,7 +707,7 @@ elif page == "🎨 قوالب الإعلانات":
         page_number = st.selectbox(
             f"صفحة النتائج (من {total_pages})",
             page_options,
-            key=f"template_page_{len(filtered_templates)}_{page_size}"
+            key=template_page_state_key(filtered_templates, page_size)
         )
 
         first_item = (page_number - 1) * page_size

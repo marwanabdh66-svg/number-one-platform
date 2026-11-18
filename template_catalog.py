@@ -7,6 +7,7 @@ These are starter concepts, not layered PSD/Canva source files.
 from __future__ import annotations
 
 import base64
+import hashlib
 import re
 from html import escape
 from itertools import product
@@ -219,6 +220,23 @@ def search_templates(
                 continue
         results.append(item)
     return results
+
+
+def template_page_state_key(templates, page_size: int) -> str:
+    """Build a stable Streamlit page selector key for the current filtered results.
+
+    Fingerprint template IDs rather than only the result count so a different
+    same-sized search result set starts pagination at page 1.
+    """
+    if isinstance(page_size, bool) or not isinstance(page_size, int) or page_size < 1:
+        raise ValueError("page_size must be a positive integer.")
+    template_ids = []
+    for item in templates or []:
+        if not isinstance(item, dict):
+            raise ValueError("Template results must contain dictionaries.")
+        template_ids.append(str(item.get("id") or ""))
+    fingerprint = hashlib.sha256("|".join(template_ids).encode("utf-8")).hexdigest()[:16]
+    return f"template_page_{fingerprint}_{page_size}"
 
 
 
