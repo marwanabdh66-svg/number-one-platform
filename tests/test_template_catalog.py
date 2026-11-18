@@ -62,9 +62,9 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
             template_page_state_key(second_results, 9),
         )
 
-    def test_template_page_key_rejects_invalid_page_size_or_entries(selfself):
+    def test_template_page_key_rejects_invalid_page_size_or_entries(self):
         for invalid_size in (0, -1, True, 1.5):
-            with self.subTest(page_size=invalid_size) as subtest:
+            with self.subTest(page_size=invalid_size):
                 with self.assertRaises(ValueError):
                     template_page_state_key([], invalid_size)
         with self.assertRaises(ValueError):
