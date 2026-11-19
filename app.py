@@ -7,7 +7,7 @@ import csv
 import io
 import json
 from datetime import datetime
-from template_catalog import TEMPLATE_CATALOG, PHOTO_PREVIEW_ASSETS, DEFAULT_LAYER_POSITIONS, DEFAULT_IMAGE_LAYER, normalize_image_layer, render_preview_data_uri, render_preview_svg, customize_template, get_template_photo_preview, fetch_photo_preview_bytes, search_templates, template_page_state_key
+from template_catalog import TEMPLATE_CATALOG, PHOTO_PREVIEW_ASSETS, DEFAULT_LAYER_POSITIONS, DEFAULT_IMAGE_LAYER, DEFAULT_SHAPE_LAYERS, normalize_image_layer, normalize_shape_layers, render_preview_data_uri, render_preview_svg, customize_template, get_template_photo_preview, fetch_photo_preview_bytes, search_templates, template_page_state_key
 from project_store import initialize_projects_table, save_project, list_projects, format_media_attribution
 from media_library import MediaLibraryError, search_commons_media
 
@@ -121,6 +121,12 @@ def initialize_template_editor_state(template):
             template_editor_state_key(template, f"image_{field}")
         ] = value
 
+    saved_shapes = normalize_shape_layers(template.get("shape_layers"))
+    for shape_name, settings in saved_shapes.items():
+        for field, value in settings.items():
+            st.session_state[
+                template_editor_state_key(template, f"shape_{shape_name}_{field}")
+            ] = value
 
 
 def rows_to_csv(rows):
@@ -1047,6 +1053,14 @@ elif page == "🤖 صانع الإعلان":
                 value,
             )
 
+        saved_shapes = normalize_shape_layers(active_template.get("shape_layers"))
+        for shape_name, settings in saved_shapes.items():
+            for field, value in settings.items():
+                st.session_state.setdefault(
+                    template_editor_state_key(active_template, f"shape_{shape_name}_{field}"),
+                    value,
+                )
+
         with st.expander("فتح أدوات تعديل القالب", expanded=True):
             edit_col1, edit_col2 = st.columns(2)
             with edit_col1:
@@ -1191,6 +1205,54 @@ elif page == "🤖 صانع الإعلان":
                     key=template_editor_state_key(active_template, "image_height"),
                 )
 
+            st.markdown("#### الأشكال الهندسية كطبقات مستقلة")
+            shape_labels = {
+                "rectangle": "مستطيل",
+                "circle": "دائرة",
+                "line": "خط",
+            }
+            selected_shape_layer = st.selectbox(
+                "اختر الشكل الذي تريد تعديله",
+                options=list(DEFAULT_SHAPE_LAYERS),
+                format_func=lambda shape_name: shape_labels[shape_name],
+                key=template_editor_state_key(active_template, "selected_shape_layer"),
+            )
+            shape_defaults = DEFAULT_SHAPE_LAYERS[selected_shape_layer]
+            show_shape = st.checkbox(
+                "إظهار الشكل داخل التصميم",
+                key=template_editor_state_key(active_template, f"shape_{selected_shape_layer}_visible"),
+            )
+            shape_col1, shape_col2 = st.columns(2)
+            with shape_col1:
+                edited_shape_x = st.slider(
+                    "موضع الشكل أفقيًا", 0, 100, step=1,
+                    key=template_editor_state_key(active_template, f"shape_{selected_shape_layer}_x"),
+                )
+                edited_shape_width = st.slider(
+                    "عرض الشكل", 1 if selected_shape_layer == "line" else 2, 80, step=1,
+                    key=template_editor_state_key(active_template, f"shape_{selected_shape_layer}_width"),
+                )
+            with shape_col2:
+                edited_shape_y = st.slider(
+                    "موضع الشكل عموديًا", 0, 100, step=1,
+                    key=template_editor_state_key(active_template, f"shape_{selected_shape_layer}_y"),
+                )
+                edited_shape_height = st.slider(
+                    "ارتفاع الشكل أو امتداده", 0 if selected_shape_layer == "line" else 2, 80, step=1,
+                    key=template_editor_state_key(active_template, f"shape_{selected_shape_layer}_height"),
+                )
+            shape_color_col, shape_stroke_col = st.columns(2)
+            with shape_color_col:
+                edited_shape_color = st.color_picker(
+                    "لون الشكل",
+                    key=template_editor_state_key(active_template, f"shape_{selected_shape_layer}_color"),
+                )
+            with shape_stroke_col:
+                edited_shape_stroke = st.slider(
+                    "سماكة الحد", 1 if selected_shape_layer == "line" else 0, 12, step=1,
+                    key=template_editor_state_key(active_template, f"shape_{selected_shape_layer}_stroke_width"),
+                )
+
         edited_layer_visibility = {
             "headline": show_headline,
             "subtitle": show_subtitle,
@@ -1220,6 +1282,31 @@ elif page == "🤖 صانع الإعلان":
             "width": edited_image_width,
             "height": edited_image_height,
         }
+        edited_shape_layers = {}
+        for shape_name, shape_defaults in DEFAULT_SHAPE_LAYERS.items():
+            edited_shape_layers[shape_name] = {
+                "visible": bool(st.session_state[
+                    template_editor_state_key(active_template, f"shape_{shape_name}_visible")
+                ]),
+                "x": int(st.session_state[
+                    template_editor_state_key(active_template, f"shape_{shape_name}_x")
+                ]),
+                "y": int(st.session_state[
+                    template_editor_state_key(active_template, f"shape_{shape_name}_y")
+                ]),
+                "width": int(st.session_state[
+                    template_editor_state_key(active_template, f"shape_{shape_name}_width")
+                ]),
+                "height": int(st.session_state[
+                    template_editor_state_key(active_template, f"shape_{shape_name}_height")
+                ]),
+                "color": str(st.session_state[
+                    template_editor_state_key(active_template, f"shape_{shape_name}_color")
+                ]),
+                "stroke_width": int(st.session_state[
+                    template_editor_state_key(active_template, f"shape_{shape_name}_stroke_width")
+                ]),
+            }
         edited_template = customize_template(
             active_template,
             headline=edited_headline,
@@ -1232,6 +1319,7 @@ elif page == "🤖 صانع الإعلان":
             layer_visibility=edited_layer_visibility,
             layer_positions=edited_layer_positions,
             image_layer=edited_image_layer,
+            shape_layers=edited_shape_layers,
         )
         st.session_state["selected_template"] = edited_template
 
@@ -1295,8 +1383,8 @@ elif page == "🤖 صانع الإعلان":
             else:
                 st.info("هذا القالب يستخدم معاينة SVG أصلية ولا يرتبط بصورة فوتوغرافية محددة.")
         st.caption(
-            "يمكنك تعديل النصوص وتحريكها، وإظهار الصورة أو إخفاءها وتغيير موضعها وحجمها. "
-            "تُحفظ إعدادات طبقة الصورة مع المشروع؛ السحب المباشر باللمس وتصدير PNG ما زالا قيد التطوير."
+            "يمكنك تعديل النصوص وتحريكها، والتحكم في الصورة والأشكال الهندسية كطبقات مستقلة. "
+            "تُحفظ إعدادات الطبقات مع المشروع؛ السحب المباشر باللمس وتصدير PNG ما زالا قيد التطوير."
         )
 
     selected_media_asset = st.session_state.get("selected_media_asset")
