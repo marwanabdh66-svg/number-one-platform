@@ -4,6 +4,8 @@ import re
 from datetime import datetime
 from urllib.parse import urlparse
 
+from template_catalog import normalize_shape_layers
+
 
 _MEDIA_FIELDS = (
     "title",
@@ -230,6 +232,10 @@ def _serialize_template_metadata(template):
                 )
             clean_image_layer[field] = value
         clean["image_layer"] = clean_image_layer
+
+    shape_layers = template.get("shape_layers")
+    if shape_layers is not None:
+        clean["shape_layers"] = normalize_shape_layers(shape_layers)
 
     if template.get("layout") is not None:
         try:
