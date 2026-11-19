@@ -6,6 +6,8 @@ from unittest.mock import MagicMock, patch
 from template_catalog import (
     PHOTO_PREVIEW_ASSETS,
     TEMPLATE_CATALOG,
+    DEFAULT_SHAPE_LAYERS,
+    normalize_shape_layers,
     get_template_photo_preview,
     fetch_photo_preview_bytes,
     search_templates,
@@ -392,6 +394,78 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
 
         self.assertTrue(data_uri.startswith("data:image/svg+xml;base64,"))
         self.assertIn('href="data:image/png;base64,', svg)
+
+
+    def test_shape_layers_are_hidden_by_default_and_have_three_types(self):
+        layers = normalize_shape_layers()
+        self.assertEqual(set(layers), {"rectangle", "circle", "line"})
+        self.assertTrue(all(not layer["visible"] for layer in layers.values()))
+        self.assertEqual(layers["line"]["height"], 0)
+
+    def test_renderer_draws_independent_rectangle_circle_and_line_layers(self):
+        customized = customize_template(
+            TEMPLATE_CATALOG[0],
+            shape_layers={
+                "rectangle": {
+                    "visible": True, "x": 10, "y": 10, "width": 20,
+                    "height": 15, "color": "#ff0000", "stroke_width": 3,
+                },
+                "circle": {
+                    "visible": True, "x": 40, "y": 20, "width": 10,
+                    "height": 10, "color": "#00ff00", "stroke_width": 2,
+                },
+                "line": {
+                    "visible": True, "x": 10, "y": 70, "width": 20,
+                    "height": 0, "color": "#0000ff", "stroke_width": 4,
+                },
+            },
+        )
+        svg = render_preview_svg(customized)
+        self.assertIn('<rect x="90" y="60" width="180" height="90" rx="12" fill="#FF0000"', svg)
+        self.assertIn('<ellipse cx="405" cy="150" rx="45" ry="30" fill="#00FF00"', svg)
+        self.assertIn('<line x1="90" y1="420" x2="270" y2="420" stroke="#0000FF" stroke-width="4"', svg)
+
+    def test_shape_layer_visibility_can_be_toggled_without_losing_settings(self):
+        customized = customize_template(
+            TEMPLATE_CATALOG[0],
+            shape_layers={
+                "rectangle": {
+                    "visible": False, "x": 15, "y": 22, "width": 30,
+                    "height": 25, "color": "#123456", "stroke_width": 4,
+                }
+            },
+        )
+        svg = render_preview_svg(customized)
+        self.assertNotIn('aria-label="طبقة المستطيل"', svg)
+        self.assertFalse(customized["shape_layers"]["rectangle"]["visible"])
+        self.assertEqual(customized["shape_layers"]["rectangle"]["x"], 15)
+        self.assertEqual(customized["shape_layers"]["rectangle"]["color"], "#123456")
+
+    def test_shape_layers_reject_unknown_names_fields_and_unsafe_values(self):
+        invalid_values = [
+            {"unknown": {"visible": True}},
+            {"rectangle": {"visible": "yes"}},
+            {"rectangle": {"x": True}},
+            {"rectangle": {"width": 81}},
+            {"rectangle": {"height": 1}},
+            {"circle": {"color": "red"}},
+            {"line": {"height": -1}},
+            {"line": {"stroke_width": 13}},
+            {"circle": {"onclick": "alert(1)"}},
+        ]
+        for value in invalid_values:
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    normalize_shape_layers(value)
+
+    def test_shape_layer_partial_updates_keep_other_default_layers(self):
+        layers = normalize_shape_layers({
+            "circle": {"visible": True, "color": "#ABCDEF"}
+        })
+        self.assertTrue(layers["circle"]["visible"])
+        self.assertEqual(layers["circle"]["color"], "#ABCDEF")
+        self.assertFalse(layers["rectangle"]["visible"])
+        self.assertFalse(layers["line"]["visible"])
 
 
 if __name__ == "__main__":
