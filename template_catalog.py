@@ -384,6 +384,36 @@ _IMAGE_LAYER_BOUNDS = {
     "height": (10, 80),
 }
 
+# طبقات هندسية مستقلة، مخفية افتراضيًا حتى لا يتغير شكل القوالب القديمة.
+DEFAULT_SHAPE_LAYERS = {
+    "rectangle": {
+        "visible": False, "x": 8, "y": 12, "width": 24, "height": 18,
+        "color": "#F0CC70", "stroke_width": 2,
+    },
+    "circle": {
+        "visible": False, "x": 30, "y": 18, "width": 16, "height": 16,
+        "color": "#243B53", "stroke_width": 2,
+    },
+    "line": {
+        "visible": False, "x": 8, "y": 48, "width": 28, "height": 0,
+        "color": "#F0CC70", "stroke_width": 5,
+    },
+}
+_SHAPE_LAYER_BOUNDS = {
+    "rectangle": {
+        "x": (0, 100), "y": (0, 100), "width": (2, 80),
+        "height": (2, 80), "stroke_width": (0, 12),
+    },
+    "circle": {
+        "x": (0, 100), "y": (0, 100), "width": (2, 80),
+        "height": (2, 80), "stroke_width": (0, 12),
+    },
+    "line": {
+        "x": (0, 100), "y": (0, 100), "width": (1, 80),
+        "height": (0, 80), "stroke_width": (1, 12),
+    },
+}
+
 _LAYER_POSITION_BOUNDS = {
     "headline": {"x": (500, 835), "y": (180, 320)},
     "subtitle": {"x": (500, 835), "y": (250, 380)},
@@ -483,6 +513,53 @@ def normalize_image_layer(value=None) -> dict:
     return layer
 
 
+def normalize_shape_layers(value=None) -> dict:
+    """Validate the three independent geometric SVG layers."""
+    layers = {
+        name: dict(settings)
+        for name, settings in DEFAULT_SHAPE_LAYERS.items()
+    }
+    if value is None:
+        return layers
+    if not isinstance(value, dict):
+        raise ValueError("Shape layers must be an object.")
+    if set(value) - set(DEFAULT_SHAPE_LAYERS):
+        raise ValueError("Shape layers contain an unknown layer.")
+
+    for layer_name, settings in value.items():
+        if not isinstance(settings, dict):
+            raise ValueError(f"Shape layer {layer_name} must be an object.")
+        if set(settings) - set(DEFAULT_SHAPE_LAYERS[layer_name]):
+            raise ValueError(f"Shape layer {layer_name} contains unsupported fields.")
+
+        normalized = dict(DEFAULT_SHAPE_LAYERS[layer_name])
+        visible = settings.get("visible", normalized["visible"])
+        if not isinstance(visible, bool):
+            raise ValueError(f"Shape layer {layer_name} visibility must be boolean.")
+        normalized["visible"] = visible
+
+        for field, (minimum, maximum) in _SHAPE_LAYER_BOUNDS[layer_name].items():
+            candidate = settings.get(field, normalized[field])
+            if (
+                isinstance(candidate, bool)
+                or not isinstance(candidate, int)
+                or candidate < minimum
+                or candidate > maximum
+            ):
+                raise ValueError(
+                    f"Shape layer {layer_name} {field} must be an integer from {minimum} to {maximum}."
+                )
+            normalized[field] = candidate
+
+        color = str(settings.get("color", normalized["color"]) or "").strip()
+        if not re.fullmatch(r"#[0-9a-fA-F]{6}", color):
+            raise ValueError(f"Shape layer {layer_name} color must be a six-digit hex color.")
+        normalized["color"] = color.upper()
+        layers[layer_name] = normalized
+
+    return layers
+
+
 def customize_template(
     template: dict,
     *,
@@ -496,6 +573,7 @@ def customize_template(
     layer_visibility=None,
     layer_positions=None,
     image_layer=None,
+    shape_layers=None,
 ) -> dict:
     """Return a safe editable copy of a catalog template without mutating its source."""
     if not isinstance(template, dict):
@@ -545,6 +623,8 @@ def customize_template(
         image_layer if image_layer is not None else result.get("image_layer")
     )
     result["image_layer"] = normalize_image_layer(image_layer_source)
+    shape_source = shape_layers if shape_layers is not None else result.get("shape_layers")
+    result["shape_layers"] = normalize_shape_layers(shape_source)
     return result
 
 
@@ -587,6 +667,55 @@ def _photo_layer_markup(
         'clip-path="url(#mediaPhotoClip)" '
         'aria-label="صورة مضافة من مكتبة الوسائط"/>'
     )
+
+
+def _shape_layers_markup(value=None) -> str:
+    """Render safe rectangle, circle, and line layers above the selected photo."""
+    layers = normalize_shape_layers(value)
+    fragments = []
+    for layer_name, layer in layers.items():
+        if not layer["visible"]:
+            continue
+        x = int(round(900 * layer["x"] / 100))
+        y = int(round(600 * layer["y"] / 100))
+        width = int(round(900 * layer["width"] / 100))
+        height = int(round(600 * layer["height"] / 100))
+        color = layer["color"]
+        stroke_width = layer["stroke_width"]
+
+        if layer_name == "rectangle":
+            width = min(width, 900 - x)
+            height = min(height, 600 - y)
+            if width <= 0 or height <= 0:
+                continue
+            fragments.append(
+                f'<rect x="{x}" y="{y}" width="{width}" height="{height}" '
+                f'rx="12" fill="{color}" fill-opacity=".18" stroke="{color}" '
+                f'stroke-width="{stroke_width}" aria-label="طبقة المستطيل"/>'
+            )
+        elif layer_name == "circle":
+            width = min(width, 900 - x)
+            height = min(height, 600 - y)
+            if width <= 0 or height <= 0:
+                continue
+            center_x = x + width // 2
+            center_y = y + height // 2
+            fragments.append(
+                f'<ellipse cx="{center_x}" cy="{center_y}" rx="{max(1, width // 2)}" '
+                f'ry="{max(1, height // 2)}" fill="{color}" fill-opacity=".18" '
+                f'stroke="{color}" stroke-width="{stroke_width}" '
+                'aria-label="طبقة الدائرة"/>'
+            )
+        else:
+            end_x = min(900, x + width)
+            end_y = min(600, y + height)
+            fragments.append(
+                f'<line x1="{x}" y1="{y}" x2="{end_x}" y2="{end_y}" '
+                f'stroke="{color}" stroke-width="{stroke_width}" '
+                'stroke-linecap="round" aria-label="طبقة الخط"/>'
+            )
+
+    return "".join(fragments)
 
 
 def render_preview_svg(template: dict, photo_bytes: bytes | None = None) -> str:
@@ -655,6 +784,7 @@ def render_preview_svg(template: dict, photo_bytes: bytes | None = None) -> str:
     ]
     art = art_by_layout[layout]
     photo_markup = _photo_layer_markup(photo_bytes, template.get("image_layer"))
+    shape_markup = _shape_layers_markup(template.get("shape_layers"))
     layer_visibility = _normalize_layer_visibility(template.get("layer_visibility"))
     accessible_label = title if layer_visibility["headline"] else category
     headline_markup = (
@@ -697,6 +827,7 @@ def render_preview_svg(template: dict, photo_bytes: bytes | None = None) -> str:
       <rect x="42" y="42" width="400" height="516" rx="24" fill="url(#panel)" opacity=".9"/>
       {art}
       {photo_markup}
+      {shape_markup}
       <text x="835" y="90" fill="{accent}" font-size="25" font-weight="800" text-anchor="end" font-family="Cairo, Arial, sans-serif">NUMBER ONE</text>
       <text x="835" y="142" fill="#C7D2E5" font-size="19" text-anchor="end" font-family="Cairo, Arial, sans-serif" direction="rtl">{category}</text>
       {headline_markup}
