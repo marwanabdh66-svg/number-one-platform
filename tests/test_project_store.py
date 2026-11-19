@@ -361,5 +361,49 @@ class ProjectStoreMediaTests(unittest.TestCase):
                     )
 
 
+    def test_project_preserves_independent_shape_layer_settings(self):
+        template = self.sample_template()
+        template["shape_layers"] = {
+            "rectangle": {
+                "visible": True, "x": 12, "y": 18, "width": 30,
+                "height": 22, "color": "#ABCDEF", "stroke_width": 3,
+            },
+            "circle": {
+                "visible": False, "x": 35, "y": 20, "width": 18,
+                "height": 18, "color": "#123456", "stroke_width": 2,
+            },
+            "line": {
+                "visible": True, "x": 5, "y": 70, "width": 40,
+                "height": 0, "color": "#FFAA00", "stroke_width": 5,
+            },
+        }
+        save_project(
+            self.connection,
+            username="user-a",
+            title="Shapes campaign",
+            prompt="Ad prompt",
+            template=template,
+        )
+        saved = json.loads(list_projects(self.connection, "user-a")[0]["template_json"])
+        self.assertEqual(saved["shape_layers"], template["shape_layers"])
+
+    def test_project_rejects_invalid_shape_layer_values(self):
+        template = self.sample_template()
+        template["shape_layers"] = {
+            "rectangle": {
+                "visible": True, "x": 10, "y": 10, "width": 20,
+                "height": 20, "color": "red", "stroke_width": 2,
+            }
+        }
+        with self.assertRaises(ValueError):
+            save_project(
+                self.connection,
+                username="user-a",
+                title="Invalid shape layer",
+                prompt="Ad prompt",
+                template=template,
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
