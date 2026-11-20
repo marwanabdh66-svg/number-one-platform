@@ -335,8 +335,19 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
         self.assertIn('x="180" y="60" width="450" height="180"', svg)
         self.assertEqual(
             customized["image_layer"],
-            {"visible": True, "x": 20, "y": 10, "width": 50, "height": 30},
+            {"visible": True, "x": 20, "y": 10, "width": 50, "height": 30, "rotation": 0},
         )
+
+    def test_photo_layer_rotation_is_rendered_around_its_center(self):
+        photo_bytes = b"\\xff\\xd8\\xff\\xe0sample-jpeg-data"
+        customized = customize_template(
+            TEMPLATE_CATALOG[0],
+            image_layer={"rotation": 45},
+        )
+        svg = render_preview_svg(customized, photo_bytes=photo_bytes)
+
+        self.assertIn('transform="rotate(45 234 315)"', svg)
+        self.assertEqual(customized["image_layer"]["rotation"], 45)
 
     def test_photo_layer_can_be_hidden_without_removing_its_settings(self):
         photo_bytes = b"\xff\xd8\xff\xe0sample-jpeg-data"
@@ -363,6 +374,9 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
             {"x": True},
             {"width": 9},
             {"height": 81},
+            {"rotation": 181},
+            {"rotation": -181},
+            {"rotation": True},
         ]
         for settings in invalid_settings:
             with self.subTest(settings=settings):
