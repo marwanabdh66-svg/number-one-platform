@@ -328,6 +328,7 @@ class ProjectStoreMediaTests(unittest.TestCase):
             "y": 22,
             "width": 55,
             "height": 46,
+            "rotation": 35,
         }
         save_project(
             self.connection,
@@ -345,6 +346,9 @@ class ProjectStoreMediaTests(unittest.TestCase):
             {"x": True},
             {"width": 9},
             {"height": 81},
+            {"rotation": 181},
+            {"rotation": -181},
+            {"rotation": True},
             {"opacity": 50},
         ]
         for image_layer in invalid_layers:
