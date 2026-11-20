@@ -81,12 +81,14 @@ _TEMPLATE_IMAGE_LAYER_DEFAULTS = {
     "y": 24,
     "width": 40,
     "height": 57,
+    "rotation": 0,
 }
 _TEMPLATE_IMAGE_LAYER_BOUNDS = {
     "x": (0, 100),
     "y": (0, 100),
     "width": (10, 80),
     "height": (10, 80),
+    "rotation": (-180, 180),
 }
 
 
