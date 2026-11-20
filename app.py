@@ -1204,6 +1204,14 @@ elif page == "🤖 صانع الإعلان":
                     step=1,
                     key=template_editor_state_key(active_template, "image_height"),
                 )
+                edited_image_rotation = st.slider(
+                    "تدوير الصورة (درجة)",
+                    min_value=-180,
+                    max_value=180,
+                    step=5,
+                    key=template_editor_state_key(active_template, "image_rotation"),
+                    help="دوّر الصورة حول مركزها دون تغيير موضعها أو أبعادها.",
+                )
 
             st.markdown("#### الأشكال الهندسية كطبقات مستقلة")
             shape_labels = {
@@ -1281,6 +1289,7 @@ elif page == "🤖 صانع الإعلان":
             "y": edited_image_y,
             "width": edited_image_width,
             "height": edited_image_height,
+            "rotation": edited_image_rotation,
         }
         edited_shape_layers = {}
         for shape_name, shape_defaults in DEFAULT_SHAPE_LAYERS.items():
