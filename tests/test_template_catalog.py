@@ -339,7 +339,7 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
         )
 
     def test_photo_layer_rotation_is_rendered_around_its_center(self):
-        photo_bytes = b"\\xff\\xd8\\xff\\xe0sample-jpeg-data"
+        photo_bytes = b"\xff\xd8\xff\xe0sample-jpeg-data"
         customized = customize_template(
             TEMPLATE_CATALOG[0],
             image_layer={"rotation": 45},
