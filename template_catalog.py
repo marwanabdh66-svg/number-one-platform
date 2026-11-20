@@ -376,12 +376,14 @@ DEFAULT_IMAGE_LAYER = {
     "y": 24,
     "width": 40,
     "height": 57,
+    "rotation": 0,
 }
 _IMAGE_LAYER_BOUNDS = {
     "x": (0, 100),
     "y": (0, 100),
     "width": (10, 80),
     "height": (10, 80),
+    "rotation": (-180, 180),
 }
 
 # طبقات هندسية مستقلة، مخفية افتراضيًا حتى لا يتغير شكل القوالب القديمة.
@@ -656,12 +658,19 @@ def _photo_layer_markup(
     y = int(round(600 * layer["y"] / 100))
     width = int(round(900 * layer["width"] / 100))
     height = int(round(600 * layer["height"] / 100))
+    center_x = x + width // 2
+    center_y = y + height // 2
+    rotation = layer["rotation"]
+    transform = (
+        f' transform="rotate({rotation} {center_x} {center_y})"'
+        if rotation else ""
+    )
     encoded = base64.b64encode(payload).decode("ascii")
     return (
         '<defs><clipPath id="mediaPhotoClip">'
         f'<rect x="{x}" y="{y}" width="{width}" height="{height}" rx="20"/>'
         '</clipPath></defs>'
-        f'<image href="data:{mime};base64,{encoded}" '
+        f'<image href="data:{mime};base64,{encoded}"{transform} '
         f'x="{x}" y="{y}" width="{width}" height="{height}" '
         'preserveAspectRatio="xMidYMid slice" '
         'clip-path="url(#mediaPhotoClip)" '
