@@ -390,29 +390,29 @@ _IMAGE_LAYER_BOUNDS = {
 DEFAULT_SHAPE_LAYERS = {
     "rectangle": {
         "visible": False, "x": 8, "y": 12, "width": 24, "height": 18,
-        "color": "#F0CC70", "stroke_width": 2,
+        "color": "#F0CC70", "stroke_width": 2, "rotation": 0,
     },
     "circle": {
         "visible": False, "x": 30, "y": 18, "width": 16, "height": 16,
-        "color": "#243B53", "stroke_width": 2,
+        "color": "#243B53", "stroke_width": 2, "rotation": 0,
     },
     "line": {
         "visible": False, "x": 8, "y": 48, "width": 28, "height": 0,
-        "color": "#F0CC70", "stroke_width": 5,
+        "color": "#F0CC70", "stroke_width": 5, "rotation": 0,
     },
 }
 _SHAPE_LAYER_BOUNDS = {
     "rectangle": {
         "x": (0, 100), "y": (0, 100), "width": (2, 80),
-        "height": (2, 80), "stroke_width": (0, 12),
+        "height": (2, 80), "stroke_width": (0, 12), "rotation": (-180, 180),
     },
     "circle": {
         "x": (0, 100), "y": (0, 100), "width": (2, 80),
-        "height": (2, 80), "stroke_width": (0, 12),
+        "height": (2, 80), "stroke_width": (0, 12), "rotation": (-180, 180),
     },
     "line": {
         "x": (0, 100), "y": (0, 100), "width": (1, 80),
-        "height": (0, 80), "stroke_width": (1, 12),
+        "height": (0, 80), "stroke_width": (1, 12), "rotation": (-180, 180),
     },
 }
 
@@ -691,16 +691,23 @@ def _shape_layers_markup(value=None) -> str:
         height = int(round(600 * layer["height"] / 100))
         color = layer["color"]
         stroke_width = layer["stroke_width"]
+        rotation = layer["rotation"]
 
         if layer_name == "rectangle":
             width = min(width, 900 - x)
             height = min(height, 600 - y)
             if width <= 0 or height <= 0:
                 continue
+            center_x = x + width // 2
+            center_y = y + height // 2
+            transform = (
+                f' transform="rotate({rotation} {center_x} {center_y})"'
+                if rotation else ""
+            )
             fragments.append(
                 f'<rect x="{x}" y="{y}" width="{width}" height="{height}" '
                 f'rx="12" fill="{color}" fill-opacity=".18" stroke="{color}" '
-                f'stroke-width="{stroke_width}" aria-label="طبقة المستطيل"/>'
+                f'stroke-width="{stroke_width}"{transform} aria-label="طبقة المستطيل"/>'
             )
         elif layer_name == "circle":
             width = min(width, 900 - x)
@@ -709,18 +716,28 @@ def _shape_layers_markup(value=None) -> str:
                 continue
             center_x = x + width // 2
             center_y = y + height // 2
+            transform = (
+                f' transform="rotate({rotation} {center_x} {center_y})"'
+                if rotation else ""
+            )
             fragments.append(
                 f'<ellipse cx="{center_x}" cy="{center_y}" rx="{max(1, width // 2)}" '
                 f'ry="{max(1, height // 2)}" fill="{color}" fill-opacity=".18" '
-                f'stroke="{color}" stroke-width="{stroke_width}" '
+                f'stroke="{color}" stroke-width="{stroke_width}"{transform} '
                 'aria-label="طبقة الدائرة"/>'
             )
         else:
             end_x = min(900, x + width)
             end_y = min(600, y + height)
+            center_x = (x + end_x) // 2
+            center_y = (y + end_y) // 2
+            transform = (
+                f' transform="rotate({rotation} {center_x} {center_y})"'
+                if rotation else ""
+            )
             fragments.append(
                 f'<line x1="{x}" y1="{y}" x2="{end_x}" y2="{end_y}" '
-                f'stroke="{color}" stroke-width="{stroke_width}" '
+                f'stroke="{color}" stroke-width="{stroke_width}"{transform} '
                 'stroke-linecap="round" aria-label="طبقة الخط"/>'
             )
 
