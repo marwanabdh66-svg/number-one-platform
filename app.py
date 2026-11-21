@@ -1260,6 +1260,14 @@ elif page == "🤖 صانع الإعلان":
                     "سماكة الحد", 1 if selected_shape_layer == "line" else 0, 12, step=1,
                     key=template_editor_state_key(active_template, f"shape_{selected_shape_layer}_stroke_width"),
                 )
+                edited_shape_rotation = st.slider(
+                    "تدوير الشكل (درجة)",
+                    min_value=-180,
+                    max_value=180,
+                    step=5,
+                    key=template_editor_state_key(active_template, f"shape_{selected_shape_layer}_rotation"),
+                    help="دوّر الشكل حول مركزه دون تغيير موضعه أو أبعاده.",
+                )
 
         edited_layer_visibility = {
             "headline": show_headline,
@@ -1314,6 +1322,9 @@ elif page == "🤖 صانع الإعلان":
                 ]),
                 "stroke_width": int(st.session_state[
                     template_editor_state_key(active_template, f"shape_{shape_name}_stroke_width")
+                ]),
+                "rotation": int(st.session_state[
+                    template_editor_state_key(active_template, f"shape_{shape_name}_rotation")
                 ]),
             }
         edited_template = customize_template(
