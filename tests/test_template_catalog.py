@@ -465,12 +465,54 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
             {"circle": {"color": "red"}},
             {"line": {"height": -1}},
             {"line": {"stroke_width": 13}},
+            {"rectangle": {"rotation": 181}},
+            {"circle": {"rotation": -181}},
+            {"line": {"rotation": True}},
             {"circle": {"onclick": "alert(1)"}},
         ]
         for value in invalid_values:
             with self.subTest(value=value):
                 with self.assertRaises(ValueError):
                     normalize_shape_layers(value)
+
+    def test_shape_layers_default_rotation_is_zero_and_valid_rotation_is_normalized(self):
+        defaults = normalize_shape_layers()
+        self.assertTrue(all(layer["rotation"] == 0 for layer in defaults.values()))
+
+        rotated = normalize_shape_layers({
+            "rectangle": {"rotation": 45},
+            "circle": {"rotation": -90},
+            "line": {"rotation": 180},
+        })
+        self.assertEqual(rotated["rectangle"]["rotation"], 45)
+        self.assertEqual(rotated["circle"]["rotation"], -90)
+        self.assertEqual(rotated["line"]["rotation"], 180)
+
+    def test_renderer_rotates_each_geometric_layer_around_its_center(self):
+        customized = customize_template(
+            TEMPLATE_CATALOG[0],
+            shape_layers={
+                "rectangle": {
+                    "visible": True, "x": 10, "y": 20, "width": 20,
+                    "height": 10, "color": "#FF0000", "stroke_width": 3,
+                    "rotation": 45,
+                },
+                "circle": {
+                    "visible": True, "x": 40, "y": 30, "width": 20,
+                    "height": 20, "color": "#00FF00", "stroke_width": 2,
+                    "rotation": -30,
+                },
+                "line": {
+                    "visible": True, "x": 5, "y": 70, "width": 40,
+                    "height": 0, "color": "#0000FF", "stroke_width": 4,
+                    "rotation": 90,
+                },
+            },
+        )
+        svg = render_preview_svg(customized)
+        self.assertIn('transform="rotate(45 180 150)"', svg)
+        self.assertIn('transform="rotate(-30 450 240)"', svg)
+        self.assertIn('transform="rotate(90 225 420)"', svg)
 
     def test_shape_layer_partial_updates_keep_other_default_layers(self):
         layers = normalize_shape_layers({
