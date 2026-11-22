@@ -556,11 +556,11 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
         ]
         customized = customize_template(
             TEMPLATE_CATALOG[0],
-            headline="HEADLINE_ORDER_MARK",
-            subtitle="SUBTITLE_ORDER_MARK",
-            price="PRICE_ORDER_MARK",
-            call_to_action="CTA_ORDER_MARK",
-            symbol="SYMORDER",
+            headline=">HEADLINE_ORDER_MARK</text>",
+            subtitle=">SUBTITLE_ORDER_MARK</text>",
+            price=">PRICE_ORDER_MARK</text>",
+            call_to_action=">CTA_ORDER_MARK</text>",
+            symbol=">SYMORDER</text>",
             image_layer={
                 "visible": True, "x": 5, "y": 5, "width": 20,
                 "height": 20, "rotation": 0,
@@ -590,11 +590,11 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
     def test_renderer_uses_legacy_layer_order_when_metadata_is_missing(self):
         customized = customize_template(
             TEMPLATE_CATALOG[0],
-            headline="DEFAULT_HEAD_MARK",
-            subtitle="DEFAULT_SUBTITLE_MARK",
-            price="DEFAULT_PRICE_MARK",
-            call_to_action="DEFAULT_CTA_MARK",
-            symbol="SYMBOL8",
+            headline=">DEFAULT_HEAD_MARK</text>",
+            subtitle=">DEFAULT_SUBTITLE_MARK</text>",
+            price=">DEFAULT_PRICE_MARK</text>",
+            call_to_action=">DEFAULT_CTA_MARK</text>",
+            symbol=">SYMBOL8</text>",
             image_layer={"visible": True},
             shape_layers={
                 "rectangle": {"visible": True},
