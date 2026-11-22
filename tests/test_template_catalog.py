@@ -560,7 +560,7 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
             subtitle="SUBTITLE_ORDER_MARK",
             price="PRICE_ORDER_MARK",
             call_to_action="CTA_ORDER_MARK",
-            symbol="SYMBOL_ORDER_MARK",
+            symbol="SYMORDER",
             image_layer={
                 "visible": True, "x": 5, "y": 5, "width": 20,
                 "height": 20, "rotation": 0,
@@ -574,7 +574,7 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
         )
         svg = render_preview_svg(customized, photo_bytes=bytes((255, 216, 255)) + b"sample-jpeg")
         markers = [
-            'SYMBOL_ORDER_MARK',
+            'SYMORDER',
             'CTA_ORDER_MARK',
             'PRICE_ORDER_MARK',
             'SUBTITLE_ORDER_MARK',
@@ -594,7 +594,7 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
             subtitle="DEFAULT_SUBTITLE_MARK",
             price="DEFAULT_PRICE_MARK",
             call_to_action="DEFAULT_CTA_MARK",
-            symbol="DEFAULT_SYMBOL_MARK",
+            symbol="SYMBOL8",
             image_layer={"visible": True},
             shape_layers={
                 "rectangle": {"visible": True},
@@ -616,7 +616,7 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
             "DEFAULT_SUBTITLE_MARK",
             "DEFAULT_PRICE_MARK",
             "DEFAULT_CTA_MARK",
-            "DEFAULT_SYMBOL_MARK",
+            "SYMBOL8",
         ]
         positions = [svg.index(marker) for marker in markers]
         self.assertEqual(positions, sorted(positions))
