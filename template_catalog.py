@@ -416,6 +416,36 @@ _SHAPE_LAYER_BOUNDS = {
     },
 }
 
+# ترتيب الطبقات من الخلف إلى الأمام، مع الحفاظ على ترتيب القوالب القديمة.
+DEFAULT_LAYER_ORDER = (
+    "image", "rectangle", "circle", "line",
+    "headline", "subtitle", "price", "call_to_action", "symbol",
+)
+
+
+def normalize_layer_order(value=None) -> list:
+    """Validate a partial or complete back-to-front order for editable layers."""
+    if value is None:
+        return list(DEFAULT_LAYER_ORDER)
+    if not isinstance(value, (list, tuple)):
+        raise ValueError("Layer order must be a list.")
+
+    allowed = set(DEFAULT_LAYER_ORDER)
+    normalized = []
+    for layer_name in value:
+        if not isinstance(layer_name, str) or layer_name not in allowed:
+            raise ValueError("Layer order contains an unknown layer.")
+        if layer_name in normalized:
+            raise ValueError("Layer order cannot contain duplicate layers.")
+        normalized.append(layer_name)
+
+    normalized.extend(
+        layer_name for layer_name in DEFAULT_LAYER_ORDER
+        if layer_name not in normalized
+    )
+    return normalized
+
+
 _LAYER_POSITION_BOUNDS = {
     "headline": {"x": (500, 835), "y": (180, 320)},
     "subtitle": {"x": (500, 835), "y": (250, 380)},
@@ -576,6 +606,7 @@ def customize_template(
     layer_positions=None,
     image_layer=None,
     shape_layers=None,
+    layer_order=None,
 ) -> dict:
     """Return a safe editable copy of a catalog template without mutating its source."""
     if not isinstance(template, dict):
@@ -627,6 +658,8 @@ def customize_template(
     result["image_layer"] = normalize_image_layer(image_layer_source)
     shape_source = shape_layers if shape_layers is not None else result.get("shape_layers")
     result["shape_layers"] = normalize_shape_layers(shape_source)
+    order_source = layer_order if layer_order is not None else result.get("layer_order")
+    result["layer_order"] = normalize_layer_order(order_source)
     return result
 
 
@@ -678,10 +711,10 @@ def _photo_layer_markup(
     )
 
 
-def _shape_layers_markup(value=None) -> str:
-    """Render safe rectangle, circle, and line layers above the selected photo."""
+def _shape_layer_markups(value=None) -> dict:
+    """Render each safe geometric layer separately so its z-order is editable."""
     layers = normalize_shape_layers(value)
-    fragments = []
+    fragments = {name: "" for name in layers}
     for layer_name, layer in layers.items():
         if not layer["visible"]:
             continue
@@ -693,7 +726,7 @@ def _shape_layers_markup(value=None) -> str:
         stroke_width = layer["stroke_width"]
         rotation = layer["rotation"]
 
-        if layer_name == "rectangle":
+        if layer_name in {"rectangle", "circle"}:
             width = min(width, 900 - x)
             height = min(height, 600 - y)
             if width <= 0 or height <= 0:
@@ -704,28 +737,19 @@ def _shape_layers_markup(value=None) -> str:
                 f' transform="rotate({rotation} {center_x} {center_y})"'
                 if rotation else ""
             )
-            fragments.append(
-                f'<rect x="{x}" y="{y}" width="{width}" height="{height}" '
-                f'rx="12" fill="{color}" fill-opacity=".18" stroke="{color}" '
-                f'stroke-width="{stroke_width}"{transform} aria-label="طبقة المستطيل"/>'
-            )
-        elif layer_name == "circle":
-            width = min(width, 900 - x)
-            height = min(height, 600 - y)
-            if width <= 0 or height <= 0:
-                continue
-            center_x = x + width // 2
-            center_y = y + height // 2
-            transform = (
-                f' transform="rotate({rotation} {center_x} {center_y})"'
-                if rotation else ""
-            )
-            fragments.append(
-                f'<ellipse cx="{center_x}" cy="{center_y}" rx="{max(1, width // 2)}" '
-                f'ry="{max(1, height // 2)}" fill="{color}" fill-opacity=".18" '
-                f'stroke="{color}" stroke-width="{stroke_width}"{transform} '
-                'aria-label="طبقة الدائرة"/>'
-            )
+            if layer_name == "rectangle":
+                fragments[layer_name] = (
+                    f'<rect x="{x}" y="{y}" width="{width}" height="{height}" '
+                    f'rx="12" fill="{color}" fill-opacity=".18" stroke="{color}" '
+                    f'stroke-width="{stroke_width}"{transform} aria-label="طبقة المستطيل"/>'
+                )
+            else:
+                fragments[layer_name] = (
+                    f'<ellipse cx="{center_x}" cy="{center_y}" rx="{max(1, width // 2)}" '
+                    f'ry="{max(1, height // 2)}" fill="{color}" fill-opacity=".18" '
+                    f'stroke="{color}" stroke-width="{stroke_width}"{transform} '
+                    'aria-label="طبقة الدائرة"/>'
+                )
         else:
             end_x = min(900, x + width)
             end_y = min(600, y + height)
@@ -735,13 +759,18 @@ def _shape_layers_markup(value=None) -> str:
                 f' transform="rotate({rotation} {center_x} {center_y})"'
                 if rotation else ""
             )
-            fragments.append(
+            fragments[layer_name] = (
                 f'<line x1="{x}" y1="{y}" x2="{end_x}" y2="{end_y}" '
                 f'stroke="{color}" stroke-width="{stroke_width}"{transform} '
                 'stroke-linecap="round" aria-label="طبقة الخط"/>'
             )
+    return fragments
 
-    return "".join(fragments)
+
+def _shape_layers_markup(value=None) -> str:
+    """Backward-compatible combined markup in the original geometric order."""
+    fragments = _shape_layer_markups(value)
+    return "".join(fragments[name] for name in DEFAULT_SHAPE_LAYERS)
 
 
 def render_preview_svg(template: dict, photo_bytes: bytes | None = None) -> str:
@@ -810,7 +839,7 @@ def render_preview_svg(template: dict, photo_bytes: bytes | None = None) -> str:
     ]
     art = art_by_layout[layout]
     photo_markup = _photo_layer_markup(photo_bytes, template.get("image_layer"))
-    shape_markup = _shape_layers_markup(template.get("shape_layers"))
+    shape_markups = _shape_layer_markups(template.get("shape_layers"))
     layer_visibility = _normalize_layer_visibility(template.get("layer_visibility"))
     accessible_label = title if layer_visibility["headline"] else category
     headline_markup = (
@@ -834,6 +863,21 @@ def render_preview_svg(template: dict, photo_bytes: bytes | None = None) -> str:
         f'<text x="{symbol_x}" y="{symbol_y}" fill="{accent}" font-size="64" text-anchor="middle" font-family="Arial, sans-serif">{symbol}</text>'
         if layer_visibility["symbol"] else ""
     )
+    editable_layer_markups = {
+        "image": photo_markup,
+        "rectangle": shape_markups["rectangle"],
+        "circle": shape_markups["circle"],
+        "line": shape_markups["line"],
+        "headline": headline_markup,
+        "subtitle": subtitle_markup,
+        "price": price_markup,
+        "call_to_action": cta_markup,
+        "symbol": symbol_markup,
+    }
+    editable_layer_markup = "".join(
+        editable_layer_markups[name]
+        for name in normalize_layer_order(template.get("layer_order"))
+    )
 
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600" role="img" aria-label="{accessible_label}">
       <defs>
@@ -852,16 +896,12 @@ def render_preview_svg(template: dict, photo_bytes: bytes | None = None) -> str:
       <circle cx="70" cy="540" r="130" fill="{accent}" opacity=".06"/>
       <rect x="42" y="42" width="400" height="516" rx="24" fill="url(#panel)" opacity=".9"/>
       {art}
-      {photo_markup}
-      {shape_markup}
       <text x="835" y="90" fill="{accent}" font-size="25" font-weight="800" text-anchor="end" font-family="Cairo, Arial, sans-serif">NUMBER ONE</text>
       <text x="835" y="142" fill="#C7D2E5" font-size="19" text-anchor="end" font-family="Cairo, Arial, sans-serif" direction="rtl">{category}</text>
-      {headline_markup}
-      {subtitle_markup}
-      {price_markup}
-      {cta_markup}
       <text x="835" y="520" fill="#9AAAC3" font-size="16" text-anchor="end" font-family="Cairo, Arial, sans-serif" direction="rtl">معاينة SVG أصلية قابلة للتطوير</text>
-      {symbol_markup}
+      <g id="editable-layer-stack">
+        {editable_layer_markup}
+      </g>
     </svg>"""
 
 
