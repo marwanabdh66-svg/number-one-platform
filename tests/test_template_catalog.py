@@ -7,7 +7,9 @@ from template_catalog import (
     PHOTO_PREVIEW_ASSETS,
     TEMPLATE_CATALOG,
     DEFAULT_SHAPE_LAYERS,
+    DEFAULT_LAYER_ORDER,
     normalize_shape_layers,
+    normalize_layer_order,
     get_template_photo_preview,
     fetch_photo_preview_bytes,
     search_templates,
@@ -522,6 +524,77 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
         self.assertEqual(layers["circle"]["color"], "#ABCDEF")
         self.assertFalse(layers["rectangle"]["visible"])
         self.assertFalse(layers["line"]["visible"])
+
+
+    def test_layer_order_defaults_and_completes_partial_orders(self):
+        self.assertEqual(normalize_layer_order(), list(DEFAULT_LAYER_ORDER))
+        partial = normalize_layer_order(["headline", "image", "rectangle"])
+        self.assertEqual(
+            partial,
+            ["headline", "image", "rectangle", "circle", "line",
+             "subtitle", "price", "call_to_action", "symbol"],
+        )
+
+    def test_layer_order_rejects_unknown_duplicate_and_non_list_values(self):
+        for invalid in ("headline", {"headline": 1}, ["headline", "headline"], ["unknown"]):
+            with self.subTest(order=invalid):
+                with self.assertRaises(ValueError):
+                    normalize_layer_order(invalid)
+
+    def test_custom_template_preserves_requested_layer_order(self):
+        order = ["symbol", "headline", "image"]
+        customized = customize_template(TEMPLATE_CATALOG[0], layer_order=order)
+        self.assertEqual(
+            customized["layer_order"],
+            order + [name for name in DEFAULT_LAYER_ORDER if name not in order],
+        )
+
+    def test_renderer_respects_layer_order_across_image_shapes_and_text(self):
+        order = [
+            "symbol", "call_to_action", "price", "subtitle", "headline",
+            "line", "circle", "rectangle", "image",
+        ]
+        customized = customize_template(
+            TEMPLATE_CATALOG[0],
+            headline="HEADLINE_ORDER_MARK",
+            subtitle="SUBTITLE_ORDER_MARK",
+            price="PRICE_ORDER_MARK",
+            call_to_action="CTA_ORDER_MARK",
+            symbol="SYMBOL_ORDER_MARK",
+            image_layer={
+                "visible": True, "x": 5, "y": 5, "width": 20,
+                "height": 20, "rotation": 0,
+            },
+            shape_layers={
+                "rectangle": {"visible": True},
+                "circle": {"visible": True},
+                "line": {"visible": True},
+            },
+            layer_order=order,
+        )
+        svg = render_preview_svg(customized, photo_bytes=b"\\xff\\xd8\\xffsample-jpeg")
+        markers = [
+            'SYMBOL_ORDER_MARK',
+            'CTA_ORDER_MARK',
+            'PRICE_ORDER_MARK',
+            'SUBTITLE_ORDER_MARK',
+            'HEADLINE_ORDER_MARK',
+            'aria-label="طبقة الخط"',
+            'aria-label="طبقة الدائرة"',
+            'aria-label="طبقة المستطيل"',
+            'aria-label="صورة مضافة من مكتبة الوسائط"',
+        ]
+        positions = [svg.index(marker) for marker in markers]
+        self.assertEqual(positions, sorted(positions))
+
+    def test_renderer_uses_legacy_layer_order_when_metadata_is_missing(self):
+        customized = customize_template(TEMPLATE_CATALOG[0])
+        self.assertEqual(customized["layer_order"], list(DEFAULT_LAYER_ORDER))
+        svg = render_preview_svg(customized)
+        self.assertLess(
+            svg.index('aria-label="طبقة المستطيل"') if 'aria-label="طبقة المستطيل"' in svg else 0,
+            svg.index('معاينة SVG أصلية قابلة للتطوير'),
+        )
 
 
 if __name__ == "__main__":
