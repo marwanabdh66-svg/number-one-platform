@@ -556,11 +556,11 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
         ]
         customized = customize_template(
             TEMPLATE_CATALOG[0],
-            headline=">HEADLINE_ORDER_MARK</text>",
-            subtitle=">SUBTITLE_ORDER_MARK</text>",
-            price=">PRICE_ORDER_MARK</text>",
-            call_to_action=">CTA_ORDER_MARK</text>",
-            symbol=">SYMORDER</text>",
+            headline="HEADLINE_ORDER_MARK",
+            subtitle="SUBTITLE_ORDER_MARK",
+            price="PRICE_ORDER_MARK",
+            call_to_action="CTA_ORDER_MARK",
+            symbol="SYMORDER",
             image_layer={
                 "visible": True, "x": 5, "y": 5, "width": 20,
                 "height": 20, "rotation": 0,
@@ -574,11 +574,11 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
         )
         svg = render_preview_svg(customized, photo_bytes=bytes((255, 216, 255)) + b"sample-jpeg")
         markers = [
-            'SYMORDER',
-            'CTA_ORDER_MARK',
-            'PRICE_ORDER_MARK',
-            'SUBTITLE_ORDER_MARK',
-            'HEADLINE_ORDER_MARK',
+            ">SYMORDER</text>",
+            ">CTA_ORDER_MARK</text>",
+            ">PRICE_ORDER_MARK</text>",
+            ">SUBTITLE_ORDER_MARK</text>",
+            ">HEADLINE_ORDER_MARK</text>",
             'aria-label="طبقة الخط"',
             'aria-label="طبقة الدائرة"',
             'aria-label="طبقة المستطيل"',
@@ -590,11 +590,11 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
     def test_renderer_uses_legacy_layer_order_when_metadata_is_missing(self):
         customized = customize_template(
             TEMPLATE_CATALOG[0],
-            headline=">DEFAULT_HEAD_MARK</text>",
-            subtitle=">DEFAULT_SUBTITLE_MARK</text>",
-            price=">DEFAULT_PRICE_MARK</text>",
-            call_to_action=">DEFAULT_CTA_MARK</text>",
-            symbol=">SYMBOL8</text>",
+            headline="DEFAULT_HEAD_MARK",
+            subtitle="DEFAULT_SUBTITLE_MARK",
+            price="DEFAULT_PRICE_MARK",
+            call_to_action="DEFAULT_CTA_MARK",
+            symbol="SYMBOL8",
             image_layer={"visible": True},
             shape_layers={
                 "rectangle": {"visible": True},
@@ -612,11 +612,11 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
             'aria-label="طبقة المستطيل"',
             'aria-label="طبقة الدائرة"',
             'aria-label="طبقة الخط"',
-            "DEFAULT_HEAD_MARK",
-            "DEFAULT_SUBTITLE_MARK",
-            "DEFAULT_PRICE_MARK",
-            "DEFAULT_CTA_MARK",
-            "SYMBOL8",
+            ">DEFAULT_HEAD_MARK</text>",
+            ">DEFAULT_SUBTITLE_MARK</text>",
+            ">DEFAULT_PRICE_MARK</text>",
+            ">DEFAULT_CTA_MARK</text>",
+            ">SYMBOL8</text>",
         ]
         positions = [svg.index(marker) for marker in markers]
         self.assertEqual(positions, sorted(positions))
