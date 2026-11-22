@@ -428,5 +428,43 @@ class ProjectStoreMediaTests(unittest.TestCase):
             )
 
 
+    def test_project_preserves_custom_layer_order(self):
+        template = self.sample_template()
+        template["layer_order"] = ["headline", "image", "rectangle"]
+        save_project(
+            self.connection,
+            username="user-a",
+            title="Ordered layers campaign",
+            prompt="Ad prompt",
+            template=template,
+        )
+        saved = json.loads(list_projects(self.connection, "user-a")[0]["template_json"])
+        self.assertEqual(
+            saved["layer_order"],
+            ["headline", "image", "rectangle", "circle", "line",
+             "subtitle", "price", "call_to_action", "symbol"],
+        )
+
+    def test_project_rejects_invalid_layer_order(self):
+        invalid_orders = [
+            ["headline", "headline"],
+            ["unknown"],
+            "headline",
+            {"headline": 1},
+        ]
+        for order in invalid_orders:
+            with self.subTest(order=order):
+                template = self.sample_template()
+                template["layer_order"] = order
+                with self.assertRaises(ValueError):
+                    save_project(
+                        self.connection,
+                        username="user-a",
+                        title="Invalid layer order",
+                        prompt="Ad prompt",
+                        template=template,
+                    )
+
+
 if __name__ == "__main__":
     unittest.main()
