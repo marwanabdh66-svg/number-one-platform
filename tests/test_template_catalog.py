@@ -572,7 +572,7 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
             },
             layer_order=order,
         )
-        svg = render_preview_svg(customized, photo_bytes=b"\\xff\\xd8\\xffsample-jpeg")
+        svg = render_preview_svg(customized, photo_bytes=bytes((255, 216, 255)) + b"sample-jpeg")
         markers = [
             'SYMBOL_ORDER_MARK',
             'CTA_ORDER_MARK',
@@ -588,13 +588,38 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
         self.assertEqual(positions, sorted(positions))
 
     def test_renderer_uses_legacy_layer_order_when_metadata_is_missing(self):
-        customized = customize_template(TEMPLATE_CATALOG[0])
-        self.assertEqual(customized["layer_order"], list(DEFAULT_LAYER_ORDER))
-        svg = render_preview_svg(customized)
-        self.assertLess(
-            svg.index('aria-label="طبقة المستطيل"') if 'aria-label="طبقة المستطيل"' in svg else 0,
-            svg.index('معاينة SVG أصلية قابلة للتطوير'),
+        customized = customize_template(
+            TEMPLATE_CATALOG[0],
+            headline="DEFAULT_HEAD_MARK",
+            subtitle="DEFAULT_SUBTITLE_MARK",
+            price="DEFAULT_PRICE_MARK",
+            call_to_action="DEFAULT_CTA_MARK",
+            symbol="DEFAULT_SYMBOL_MARK",
+            image_layer={"visible": True},
+            shape_layers={
+                "rectangle": {"visible": True},
+                "circle": {"visible": True},
+                "line": {"visible": True},
+            },
         )
+        self.assertEqual(customized["layer_order"], list(DEFAULT_LAYER_ORDER))
+        svg = render_preview_svg(
+            customized,
+            photo_bytes=bytes((255, 216, 255)) + b"sample-jpeg",
+        )
+        markers = [
+            'aria-label="صورة مضافة من مكتبة الوسائط"',
+            'aria-label="طبقة المستطيل"',
+            'aria-label="طبقة الدائرة"',
+            'aria-label="طبقة الخط"',
+            "DEFAULT_HEAD_MARK",
+            "DEFAULT_SUBTITLE_MARK",
+            "DEFAULT_PRICE_MARK",
+            "DEFAULT_CTA_MARK",
+            "DEFAULT_SYMBOL_MARK",
+        ]
+        positions = [svg.index(marker) for marker in markers]
+        self.assertEqual(positions, sorted(positions))
 
 
 if __name__ == "__main__":
