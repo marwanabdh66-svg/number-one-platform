@@ -7,7 +7,7 @@ import csv
 import io
 import json
 from datetime import datetime
-from template_catalog import TEMPLATE_CATALOG, PHOTO_PREVIEW_ASSETS, DEFAULT_LAYER_POSITIONS, DEFAULT_IMAGE_LAYER, DEFAULT_SHAPE_LAYERS, normalize_image_layer, normalize_shape_layers, render_preview_data_uri, render_preview_svg, customize_template, get_template_photo_preview, fetch_photo_preview_bytes, search_templates, template_page_state_key
+from template_catalog import TEMPLATE_CATALOG, PHOTO_PREVIEW_ASSETS, DEFAULT_LAYER_POSITIONS, DEFAULT_IMAGE_LAYER, DEFAULT_SHAPE_LAYERS, DEFAULT_LAYER_ORDER, normalize_image_layer, normalize_shape_layers, normalize_layer_order, render_preview_data_uri, render_preview_svg, customize_template, get_template_photo_preview, fetch_photo_preview_bytes, search_templates, template_page_state_key
 from project_store import initialize_projects_table, save_project, list_projects, format_media_attribution
 from media_library import MediaLibraryError, search_commons_media
 
@@ -127,6 +127,9 @@ def initialize_template_editor_state(template):
             st.session_state[
                 template_editor_state_key(template, f"shape_{shape_name}_{field}")
             ] = value
+    st.session_state[template_editor_state_key(template, "layer_order")] = (
+        normalize_layer_order(template.get("layer_order"))
+    )
 
 
 def rows_to_csv(rows):
@@ -1060,6 +1063,11 @@ elif page == "🤖 صانع الإعلان":
                     template_editor_state_key(active_template, f"shape_{shape_name}_{field}"),
                     value,
                 )
+        order_state_key = template_editor_state_key(active_template, "layer_order")
+        st.session_state.setdefault(
+            order_state_key,
+            normalize_layer_order(active_template.get("layer_order")),
+        )
 
         with st.expander("فتح أدوات تعديل القالب", expanded=True):
             edit_col1, edit_col2 = st.columns(2)
@@ -1269,6 +1277,58 @@ elif page == "🤖 صانع الإعلان":
                     help="دوّر الشكل حول مركزه دون تغيير موضعه أو أبعاده.",
                 )
 
+            st.markdown("#### ترتيب الطبقات من الخلف إلى الأمام")
+            layer_order_labels = {
+                "image": "الصورة",
+                "rectangle": "المستطيل",
+                "circle": "الدائرة",
+                "line": "الخط",
+                "headline": "العنوان الرئيسي",
+                "subtitle": "النص المساعد",
+                "price": "السعر أو العرض",
+                "call_to_action": "زر الدعوة للإجراء",
+                "symbol": "الرمز أو الأيقونة",
+            }
+            current_layer_order = normalize_layer_order(
+                st.session_state.get(order_state_key)
+            )
+            st.session_state[order_state_key] = current_layer_order
+            selected_order_layer = st.selectbox(
+                "اختر الطبقة التي تريد تغيير ترتيبها",
+                options=list(DEFAULT_LAYER_ORDER),
+                format_func=lambda name: layer_order_labels[name],
+                key=template_editor_state_key(active_template, "order_selected_layer"),
+            )
+            order_back_col, order_front_col = st.columns(2)
+            with order_back_col:
+                if st.button(
+                    "إرسال إلى الخلف",
+                    key=template_editor_state_key(active_template, "layer_send_back"),
+                    use_container_width=True,
+                ):
+                    order = list(st.session_state[order_state_key])
+                    index = order.index(selected_order_layer)
+                    if index > 0:
+                        order[index - 1], order[index] = order[index], order[index - 1]
+                        st.session_state[order_state_key] = order
+                    st.rerun()
+            with order_front_col:
+                if st.button(
+                    "تقديم إلى الأمام",
+                    key=template_editor_state_key(active_template, "layer_bring_forward"),
+                    use_container_width=True,
+                ):
+                    order = list(st.session_state[order_state_key])
+                    index = order.index(selected_order_layer)
+                    if index < len(order) - 1:
+                        order[index + 1], order[index] = order[index], order[index + 1]
+                        st.session_state[order_state_key] = order
+                    st.rerun()
+            st.caption(
+                "ترتيب القائمة من الخلف إلى الأمام. يمكنك تقديم الصورة أو الأشكال أو النصوص "
+                "لتظهر فوق الطبقات الأخرى، أو إرسالها إلى الخلف."
+            )
+
         edited_layer_visibility = {
             "headline": show_headline,
             "subtitle": show_subtitle,
@@ -1327,6 +1387,9 @@ elif page == "🤖 صانع الإعلان":
                     template_editor_state_key(active_template, f"shape_{shape_name}_rotation")
                 ]),
             }
+        edited_layer_order = normalize_layer_order(
+            st.session_state.get(order_state_key)
+        )
         edited_template = customize_template(
             active_template,
             headline=edited_headline,
@@ -1340,6 +1403,7 @@ elif page == "🤖 صانع الإعلان":
             layer_positions=edited_layer_positions,
             image_layer=edited_image_layer,
             shape_layers=edited_shape_layers,
+            layer_order=edited_layer_order,
         )
         st.session_state["selected_template"] = edited_template
 
