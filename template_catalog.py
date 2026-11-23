@@ -255,6 +255,16 @@ PHOTO_PREVIEW_ASSETS = {
         "license_notice": "نسب المؤلف ورابط الترخيص؛ وأي تعديل للصورة يخضع لشرط المشاركة بالمثل.",
         "attribution_required": True,
     },
+    ("المطاعم والمقاهي", "برغر فاخر"): {
+        "title": "Hamburger (black bg).jpg — صورة همبرغر",
+        "preview_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/47/Hamburger_%28black_bg%29.jpg/960px-Hamburger_%28black_bg%29.jpg",
+        "page_url": "https://commons.wikimedia.org/wiki/File:Hamburger_(black_bg).jpg",
+        "artist": "Len Rizzi (photographer), reprocessed by Off-shell",
+        "license_name": "CC0 1.0",
+        "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "license_notice": "الصورة المشتقة مخصصة للملكية العامة بموجب CC0 1.0؛ وتذكر صفحة الملف أن الصورة الأصلية من المعاهد الوطنية للصحة ضمن الملكية العامة.",
+        "attribution_required": False,
+    },
     ("العطور والتجميل", "عطر جديد"): {
         "title": "Perfume glass bottle.jpg — صورة زجاجة عطر",
         "preview_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/79/Perfume_glass_bottle.jpg/960px-Perfume_glass_bottle.jpg",

@@ -75,7 +75,7 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
             template_page_state_key([None], 9)
 
     def test_curated_photo_sources_have_license_and_attribution_metadata(self):
-        self.assertEqual(len(PHOTO_PREVIEW_ASSETS), 8)
+        self.assertEqual(len(PHOTO_PREVIEW_ASSETS), 9)
         for asset in PHOTO_PREVIEW_ASSETS.values():
             self.assertTrue(asset["preview_url"].startswith("https://"))
             self.assertTrue(asset["page_url"].startswith("https://commons.wikimedia.org/wiki/File:"))
@@ -88,13 +88,36 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
                 self.assertFalse(asset["attribution_required"])
                 self.assertIn("CC0", asset["license_name"])
 
-    def test_eight_topic_families_receive_photographic_previews(self):
+    def test_burger_topic_uses_verified_cc0_photo_preview(self):
+        asset = PHOTO_PREVIEW_ASSETS[("المطاعم والمقاهي", "برغر فاخر")]
+        self.assertEqual(asset["license_name"], "CC0 1.0")
+        self.assertFalse(asset["attribution_required"])
+        self.assertEqual(
+            asset["artist"],
+            "Len Rizzi (photographer), reprocessed by Off-shell",
+        )
+        self.assertIn("Hamburger_%28black_bg%29.jpg", asset["preview_url"])
+
+        variants = [
+            item for item in TEMPLATE_CATALOG
+            if item["category"] == "المطاعم والمقاهي"
+            and item["topic"] == "برغر فاخر"
+        ]
+        self.assertEqual(len(variants), 5)
+        self.assertTrue(
+            all(
+                get_template_photo_preview(item)["title"] == asset["title"]
+                for item in variants
+            )
+        )
+
+    def test_nine_topic_families_receive_photographic_previews(self):
         mapped_count = sum(
             get_template_photo_preview(item) is not None
             for item in TEMPLATE_CATALOG
         )
-        # Eight selected topics x five format variants each.
-        self.assertEqual(mapped_count, 40)
+        # Nine selected topics x five format variants each.
+        self.assertEqual(mapped_count, 45)
 
     def test_unmapped_template_uses_svg_fallback(self):
         unmapped = next(
