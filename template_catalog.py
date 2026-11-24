@@ -400,29 +400,29 @@ _IMAGE_LAYER_BOUNDS = {
 DEFAULT_SHAPE_LAYERS = {
     "rectangle": {
         "visible": False, "x": 8, "y": 12, "width": 24, "height": 18,
-        "color": "#F0CC70", "stroke_width": 2, "rotation": 0,
+        "color": "#F0CC70", "stroke_width": 2, "rotation": 0, "opacity": 100,
     },
     "circle": {
         "visible": False, "x": 30, "y": 18, "width": 16, "height": 16,
-        "color": "#243B53", "stroke_width": 2, "rotation": 0,
+        "color": "#243B53", "stroke_width": 2, "rotation": 0, "opacity": 100,
     },
     "line": {
         "visible": False, "x": 8, "y": 48, "width": 28, "height": 0,
-        "color": "#F0CC70", "stroke_width": 5, "rotation": 0,
+        "color": "#F0CC70", "stroke_width": 5, "rotation": 0, "opacity": 100,
     },
 }
 _SHAPE_LAYER_BOUNDS = {
     "rectangle": {
         "x": (0, 100), "y": (0, 100), "width": (2, 80),
-        "height": (2, 80), "stroke_width": (0, 12), "rotation": (-180, 180),
+        "height": (2, 80), "stroke_width": (0, 12), "rotation": (-180, 180), "opacity": (0, 100),
     },
     "circle": {
         "x": (0, 100), "y": (0, 100), "width": (2, 80),
-        "height": (2, 80), "stroke_width": (0, 12), "rotation": (-180, 180),
+        "height": (2, 80), "stroke_width": (0, 12), "rotation": (-180, 180), "opacity": (0, 100),
     },
     "line": {
         "x": (0, 100), "y": (0, 100), "width": (1, 80),
-        "height": (0, 80), "stroke_width": (1, 12), "rotation": (-180, 180),
+        "height": (0, 80), "stroke_width": (1, 12), "rotation": (-180, 180), "opacity": (0, 100),
     },
 }
 
@@ -735,6 +735,7 @@ def _shape_layer_markups(value=None) -> dict:
         color = layer["color"]
         stroke_width = layer["stroke_width"]
         rotation = layer["rotation"]
+        opacity = layer["opacity"] / 100
 
         if layer_name in {"rectangle", "circle"}:
             width = min(width, 900 - x)
@@ -751,13 +752,13 @@ def _shape_layer_markups(value=None) -> dict:
                 fragments[layer_name] = (
                     f'<rect x="{x}" y="{y}" width="{width}" height="{height}" '
                     f'rx="12" fill="{color}" fill-opacity=".18" stroke="{color}" '
-                    f'stroke-width="{stroke_width}"{transform} aria-label="طبقة المستطيل"/>'
+                    f'stroke-width="{stroke_width}" opacity="{opacity:.2f}"{transform} aria-label="طبقة المستطيل"/>'
                 )
             else:
                 fragments[layer_name] = (
                     f'<ellipse cx="{center_x}" cy="{center_y}" rx="{max(1, width // 2)}" '
                     f'ry="{max(1, height // 2)}" fill="{color}" fill-opacity=".18" '
-                    f'stroke="{color}" stroke-width="{stroke_width}"{transform} '
+                    f'stroke="{color}" stroke-width="{stroke_width}" opacity="{opacity:.2f}"{transform} '
                     'aria-label="طبقة الدائرة"/>'
                 )
         else:
@@ -771,7 +772,7 @@ def _shape_layer_markups(value=None) -> dict:
             )
             fragments[layer_name] = (
                 f'<line x1="{x}" y1="{y}" x2="{end_x}" y2="{end_y}" '
-                f'stroke="{color}" stroke-width="{stroke_width}"{transform} '
+                f'stroke="{color}" stroke-width="{stroke_width}" opacity="{opacity:.2f}"{transform} '
                 'stroke-linecap="round" aria-label="طبقة الخط"/>'
             )
     return fragments
