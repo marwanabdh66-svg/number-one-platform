@@ -1276,6 +1276,14 @@ elif page == "🤖 صانع الإعلان":
                     key=template_editor_state_key(active_template, f"shape_{selected_shape_layer}_rotation"),
                     help="دوّر الشكل حول مركزه دون تغيير موضعه أو أبعاده.",
                 )
+                edited_shape_opacity = st.slider(
+                    "شفافية الشكل (%)",
+                    min_value=0,
+                    max_value=100,
+                    step=5,
+                    key=template_editor_state_key(active_template, f"shape_{selected_shape_layer}_opacity"),
+                    help="0 يخفي الشكل بصريًا و100 يعرضه بكامل الوضوح.",
+                )
 
             st.markdown("#### ترتيب الطبقات من الخلف إلى الأمام")
             layer_order_labels = {
@@ -1385,6 +1393,9 @@ elif page == "🤖 صانع الإعلان":
                 ]),
                 "rotation": int(st.session_state[
                     template_editor_state_key(active_template, f"shape_{shape_name}_rotation")
+                ]),
+                "opacity": int(st.session_state[
+                    template_editor_state_key(active_template, f"shape_{shape_name}_opacity")
                 ]),
             }
         edited_layer_order = normalize_layer_order(
