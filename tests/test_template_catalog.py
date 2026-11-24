@@ -439,6 +439,7 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
         layers = normalize_shape_layers()
         self.assertEqual(set(layers), {"rectangle", "circle", "line"})
         self.assertTrue(all(not layer["visible"] for layer in layers.values()))
+        self.assertTrue(all(layer["opacity"] == 100 for layer in layers.values()))
         self.assertEqual(layers["line"]["height"], 0)
 
     def test_renderer_draws_independent_rectangle_circle_and_line_layers(self):
@@ -448,21 +449,26 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
                 "rectangle": {
                     "visible": True, "x": 10, "y": 10, "width": 20,
                     "height": 15, "color": "#ff0000", "stroke_width": 3,
+                    "opacity": 80,
                 },
                 "circle": {
                     "visible": True, "x": 40, "y": 20, "width": 10,
                     "height": 10, "color": "#00ff00", "stroke_width": 2,
+                    "opacity": 55,
                 },
                 "line": {
                     "visible": True, "x": 10, "y": 70, "width": 20,
                     "height": 0, "color": "#0000ff", "stroke_width": 4,
+                    "opacity": 25,
                 },
             },
         )
         svg = render_preview_svg(customized)
         self.assertIn('<rect x="90" y="60" width="180" height="90" rx="12" fill="#FF0000"', svg)
         self.assertIn('<ellipse cx="405" cy="150" rx="45" ry="30" fill="#00FF00"', svg)
-        self.assertIn('<line x1="90" y1="420" x2="270" y2="420" stroke="#0000FF" stroke-width="4"', svg)
+        self.assertIn('<line x1="90" y1="420" x2="270" y2="420" stroke="#0000FF" stroke-width="4" opacity="0.25"', svg)
+        self.assertIn('stroke-width="3" opacity="0.80"', svg)
+        self.assertIn('stroke-width="2" opacity="0.55"', svg)
 
     def test_shape_layer_visibility_can_be_toggled_without_losing_settings(self):
         customized = customize_template(
@@ -493,6 +499,10 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
             {"rectangle": {"rotation": 181}},
             {"circle": {"rotation": -181}},
             {"line": {"rotation": True}},
+            {"rectangle": {"opacity": -1}},
+            {"circle": {"opacity": 101}},
+            {"line": {"opacity": True}},
+            {"circle": {"opacity": 50.5}},
             {"circle": {"onclick": "alert(1)"}},
         ]
         for value in invalid_values:
@@ -538,6 +548,14 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
         self.assertIn('transform="rotate(45 180 150)"', svg)
         self.assertIn('transform="rotate(-30 450 240)"', svg)
         self.assertIn('transform="rotate(90 225 420)"', svg)
+
+    def test_shape_layer_opacity_defaults_and_partial_updates(self):
+        defaults = normalize_shape_layers()
+        self.assertTrue(all(layer["opacity"] == 100 for layer in defaults.values()))
+        customized = normalize_shape_layers({"circle": {"opacity": 35}})
+        self.assertEqual(customized["circle"]["opacity"], 35)
+        self.assertEqual(customized["rectangle"]["opacity"], 100)
+        self.assertEqual(customized["line"]["opacity"], 100)
 
     def test_shape_layer_partial_updates_keep_other_default_layers(self):
         layers = normalize_shape_layers({
