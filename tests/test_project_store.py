@@ -371,17 +371,17 @@ class ProjectStoreMediaTests(unittest.TestCase):
             "rectangle": {
                 "visible": True, "x": 12, "y": 18, "width": 30,
                 "height": 22, "color": "#ABCDEF", "stroke_width": 3,
-                "rotation": 25,
+                "rotation": 25, "opacity": 72,
             },
             "circle": {
                 "visible": False, "x": 35, "y": 20, "width": 18,
                 "height": 18, "color": "#123456", "stroke_width": 2,
-                "rotation": -45,
+                "rotation": -45, "opacity": 45,
             },
             "line": {
                 "visible": True, "x": 5, "y": 70, "width": 40,
                 "height": 0, "color": "#FFAA00", "stroke_width": 5,
-                "rotation": 90,
+                "rotation": 90, "opacity": 100,
             },
         }
         save_project(
@@ -406,6 +406,22 @@ class ProjectStoreMediaTests(unittest.TestCase):
                         self.connection,
                         username="user-a",
                         title="Invalid shape rotation",
+                        prompt="Ad prompt",
+                        template=template,
+                    )
+
+    def test_project_rejects_out_of_range_shape_opacity(self):
+        for opacity in (-1, 101, True, 50.5):
+            with self.subTest(opacity=opacity):
+                template = self.sample_template()
+                template["shape_layers"] = {
+                    "rectangle": {"visible": True, "opacity": opacity}
+                }
+                with self.assertRaises(ValueError):
+                    save_project(
+                        self.connection,
+                        username="user-a",
+                        title="Invalid shape opacity",
                         prompt="Ad prompt",
                         template=template,
                     )
