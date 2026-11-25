@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import sqlite3
 import hashlib
 import secrets
@@ -10,6 +11,7 @@ from datetime import datetime
 from template_catalog import TEMPLATE_CATALOG, PHOTO_PREVIEW_ASSETS, DEFAULT_LAYER_POSITIONS, DEFAULT_IMAGE_LAYER, DEFAULT_SHAPE_LAYERS, DEFAULT_LAYER_ORDER, normalize_image_layer, normalize_shape_layers, normalize_layer_order, render_preview_data_uri, render_preview_svg, customize_template, get_template_photo_preview, fetch_photo_preview_bytes, search_templates, template_page_state_key
 from project_store import initialize_projects_table, save_project, list_projects, format_media_attribution
 from media_library import MediaLibraryError, search_commons_media
+from png_export import build_png_export_html
 
 # =====================================
 # NUMBER ONE - AI AD STUDIO
@@ -1440,13 +1442,30 @@ elif page == "🤖 صانع الإعلان":
                 'style="display:block;width:100%;height:auto;border-radius:14px;border:1px solid #344663">',
                 unsafe_allow_html=True,
             )
+            export_svg = render_preview_svg(
+                edited_template,
+                photo_bytes=editor_photo_bytes,
+            )
             st.download_button(
                 "تنزيل معاينة التصميم SVG",
-                data=render_preview_svg(edited_template, photo_bytes=editor_photo_bytes),
+                data=export_svg,
                 file_name="number_one_template.svg",
                 mime="image/svg+xml",
                 key=f"download_edited_template_{edited_template.get('id', 'selected')}",
                 use_container_width=True,
+            )
+            components.html(
+                build_png_export_html(
+                    export_svg,
+                    filename=f"NUMBER_ONE_{edited_template.get('id', 'design')}.png",
+                    scale=2,
+                ),
+                height=76,
+                scrolling=False,
+            )
+            st.caption(
+                "يُحوَّل التصميم إلى PNG داخل متصفحك بدقة مضاعفة 2×؛ "
+                "لا تُرسل بيانات التصميم إلى خدمة تحويل خارجية."
             )
             if selected_media_for_editor and selected_media_for_editor.get("media_type") == "image":
                 if editor_photo_bytes:
