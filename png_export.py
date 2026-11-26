@@ -8,7 +8,29 @@ import xml.etree.ElementTree as ET
 
 
 _MAX_SVG_BYTES = 4_000_000
-_EXTERNAL_RESOURCE = re.compile(r"url\(\s*['\"]?(?:https?:)?//", re.IGNORECASE)
+_SAFE_DATA_IMAGE = re.compile(
+    r"^data:image/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/=\s]+$",
+    re.IGNORECASE,
+)
+_CSS_IMPORT = re.compile(r"@import\b", re.IGNORECASE)
+_CSS_URL = re.compile(
+    r"url\(\s*(?:(['\"])(.*?)\1|([^)]*))\s*\)",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _validate_css_references(value: str) -> None:
+    """Reject CSS imports and resource URLs that escape the self-contained SVG."""
+    css = str(value or "")
+    if _CSS_IMPORT.search(css):
+        raise ValueError("SVG CSS imports are not supported.")
+    for match in _CSS_URL.finditer(css):
+        resource = (
+            match.group(2) if match.group(1) else match.group(3) or ""
+        ).strip()
+        if resource.startswith("#") or _SAFE_DATA_IMAGE.fullmatch(resource):
+            continue
+        raise ValueError("SVG external CSS resources are not supported.")
 
 
 def _safe_png_filename(value: str) -> str:
@@ -61,11 +83,12 @@ def build_png_export_html(
             if attribute_name in {"href", "src"}:
                 resource = str(value).strip()
                 if resource and not (
-                    resource.startswith("#") or resource.startswith("data:image/")
+                    resource.startswith("#") or _SAFE_DATA_IMAGE.fullmatch(resource)
                 ):
                     raise ValueError("SVG external resources are not supported.")
-    if _EXTERNAL_RESOURCE.search(svg):
-        raise ValueError("SVG external CSS resources are not supported.")
+            _validate_css_references(value)
+        if tag_name == "style":
+            _validate_css_references(element.text or "")
 
     encoded_svg = base64.b64encode(payload).decode("ascii")
     safe_filename = json.dumps(_safe_png_filename(filename))
