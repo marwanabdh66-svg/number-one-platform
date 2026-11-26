@@ -52,6 +52,32 @@ class PngExportTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     build_png_export_html(svg)
 
+    def test_export_rejects_css_imports_and_relative_resource_urls(self):
+        unsafe_svgs = (
+            '<svg xmlns="http://www.w3.org/2000/svg"><style>@import "https://example.com/theme.css";</style></svg>',
+            '<svg xmlns="http://www.w3.org/2000/svg"><rect style="filter:url(/assets/filter.svg#blur)"/></svg>',
+        )
+        for svg in unsafe_svgs:
+            with self.subTest(svg=svg):
+                with self.assertRaises(ValueError):
+                    build_png_export_html(svg)
+
+    def test_export_allows_raster_data_images_but_rejects_nested_svg_data(self):
+        raster_svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg">'
+            '<image href="data:image/jpeg;base64,/9j/2Q=="/>'
+            '</svg>'
+        )
+        self.assertIn("number-one-png-export", build_png_export_html(raster_svg))
+
+        nested_svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg">'
+            '<image href="data:image/svg+xml;base64,PHN2Zy8+"/>'
+            '</svg>'
+        )
+        with self.assertRaises(ValueError):
+            build_png_export_html(nested_svg)
+
     def test_export_rejects_payloads_above_size_limit(self):
         large_svg = '<svg xmlns="http://www.w3.org/2000/svg">' + (" " * 4_000_001) + "</svg>"
         with self.assertRaises(ValueError):
