@@ -662,6 +662,31 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
         positions = [svg.index(marker) for marker in markers]
         self.assertEqual(positions, sorted(positions))
 
+    def test_renderer_wraps_editable_layers_with_pointer_drag_targets(self):
+        template = customize_template(
+            TEMPLATE_CATALOG[0],
+            price="100 ريال",
+            layer_visibility={
+                "headline": True,
+                "subtitle": True,
+                "price": True,
+                "call_to_action": True,
+                "symbol": True,
+            },
+            shape_layers={
+                "rectangle": {"visible": True},
+                "circle": {"visible": True},
+                "line": {"visible": True},
+            },
+        )
+        svg = render_preview_svg(template, photo_bytes=b"\\xff\\xd8\\xffphoto")
+        for layer_name in (
+            "image", "rectangle", "circle", "line",
+            "headline", "subtitle", "price", "call_to_action", "symbol",
+        ):
+            with self.subTest(layer=layer_name):
+                self.assertIn(f'<g data-layer="{layer_name}">', svg)
+
 
 if __name__ == "__main__":
     unittest.main()
