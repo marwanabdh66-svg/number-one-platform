@@ -12,6 +12,8 @@ from template_catalog import TEMPLATE_CATALOG, PHOTO_PREVIEW_ASSETS, DEFAULT_LAY
 from project_store import initialize_projects_table, save_project, list_projects, format_media_attribution
 from media_library import MediaLibraryError, search_commons_media
 from png_export import build_png_export_html
+from canvas_editor import render_canvas_editor
+from canvas_drag import apply_canvas_drag
 
 # =====================================
 # NUMBER ONE - AI AD STUDIO
@@ -998,6 +1000,35 @@ elif page == "🤖 صانع الإعلان":
         st.success(f"تم تحميل القالب «{selected_notice}» في نموذج الإعلان. أكمل بيانات مشروعك.")
 
     active_template = st.session_state.get("selected_template")
+    pending_canvas_drag = st.session_state.pop("_pending_canvas_drag", None)
+    if isinstance(active_template, dict) and isinstance(pending_canvas_drag, dict):
+        pending_token = str(pending_canvas_drag.get("token") or "")
+        if pending_token:
+            st.session_state["_last_canvas_drag_token"] = pending_token
+            if str(pending_canvas_drag.get("template_id") or "") == str(active_template.get("id") or ""):
+                try:
+                    active_template = apply_canvas_drag(active_template, pending_canvas_drag)
+                except ValueError as exc:
+                    st.warning(f"تعذر تطبيق حركة العنصر: {exc}")
+                else:
+                    st.session_state["selected_template"] = active_template
+                    for layer_name, position in active_template["layer_positions"].items():
+                        for axis in ("x", "y"):
+                            st.session_state[
+                                template_editor_state_key(active_template, f"position_{layer_name}_{axis}")
+                            ] = int(position[axis])
+                    image_settings = normalize_image_layer(active_template.get("image_layer"))
+                    for axis in ("x", "y"):
+                        st.session_state[
+                            template_editor_state_key(active_template, f"image_{axis}")
+                        ] = int(image_settings[axis])
+                    shape_settings = normalize_shape_layers(active_template.get("shape_layers"))
+                    for shape_name, settings in shape_settings.items():
+                        for axis in ("x", "y"):
+                            st.session_state[
+                                template_editor_state_key(active_template, f"shape_{shape_name}_{axis}")
+                            ] = int(settings[axis])
+
     if active_template:
         st.markdown("### ✏️ محرر معاينة القالب")
         st.caption(
@@ -1432,20 +1463,21 @@ elif page == "🤖 صانع الإعلان":
                 editor_photo_bytes = cached_template_photo(
                     selected_media_for_editor.get("preview_url") or ""
                 )
-            preview_uri = render_preview_data_uri(
-                edited_template,
-                photo_bytes=editor_photo_bytes,
-            )
-            safe_preview_title = html.escape(str(edited_template.get("headline", "قالب NUMBER ONE")))
-            st.markdown(
-                f'<img src="{preview_uri}" alt="{safe_preview_title}" '
-                'style="display:block;width:100%;height:auto;border-radius:14px;border:1px solid #344663">',
-                unsafe_allow_html=True,
-            )
             export_svg = render_preview_svg(
                 edited_template,
                 photo_bytes=editor_photo_bytes,
             )
+            drag_event = render_canvas_editor(
+                export_svg,
+                template_id=edited_template.get("id", ""),
+                key=f"number_one_canvas_{edited_template.get('id', 'selected')}",
+            )
+            if isinstance(drag_event, dict):
+                drag_token = str(drag_event.get("token") or "")
+                if drag_token and drag_token != st.session_state.get("_last_canvas_drag_token"):
+                    st.session_state["_pending_canvas_drag"] = dict(drag_event)
+                    st.rerun()
+            st.caption("اسحب الصورة أو الشكل أو النص مباشرة داخل المعاينة لتغيير موضعه، بالماوس أو باللمس.")
             st.download_button(
                 "تنزيل معاينة التصميم SVG",
                 data=export_svg,
