@@ -886,8 +886,9 @@ def render_preview_svg(template: dict, photo_bytes: bytes | None = None) -> str:
         "symbol": symbol_markup,
     }
     editable_layer_markup = "".join(
-        editable_layer_markups[name]
+        f'<g data-layer="{name}">{editable_layer_markups[name]}</g>'
         for name in normalize_layer_order(template.get("layer_order"))
+        if editable_layer_markups[name]
     )
 
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600" role="img" aria-label="{accessible_label}">
