@@ -4,7 +4,7 @@ from pathlib import Path
 import streamlit.components.v1 as components
 
 
-_FRONTEND = Path(__file__).parent / "canvas_editor_frontend"
+_FRONTEND = (Path(__file__).parent / "canvas_editor_frontend").resolve()
 _component = components.declare_component(
     "number_one_canvas_editor",
     path=str(_FRONTEND),
