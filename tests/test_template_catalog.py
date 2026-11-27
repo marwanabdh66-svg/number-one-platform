@@ -679,7 +679,7 @@ class TemplateCatalogPhotoPreviewTests(unittest.TestCase):
                 "line": {"visible": True},
             },
         )
-        svg = render_preview_svg(template, photo_bytes=b"\\xff\\xd8\\xffphoto")
+        svg = render_preview_svg(template, photo_bytes=b"\xff\xd8\xffphoto")
         for layer_name in (
             "image", "rectangle", "circle", "line",
             "headline", "subtitle", "price", "call_to_action", "symbol",
