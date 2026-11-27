@@ -2,7 +2,7 @@ name: فحص المنصة
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/400-svg-template-catalog]
   pull_request:
     branches: [main]
 
