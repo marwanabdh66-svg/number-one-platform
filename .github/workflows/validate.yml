@@ -21,7 +21,19 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       - name: فحص صياغة ملفات Python
-        run: python -m py_compile app.py template_catalog.py project_store.py media_library.py canvas_drag.py canvas_editor.py tests/test_media_library.py tests/test_project_store.py tests/test_template_catalog.py tests/test_canvas_drag.py png_export.py tests/test_png_export.py
+        run: python -m py_compile app.py template_catalog.py project_store.py media_library.py canvas_drag.py canvas_editor.py tests/test_media_library.py tests/test_project_store.py tests/test_template_catalog.py tests/test_canvas_drag.py canvas_editor.py tests/test_canvas_editor.py png_export.py tests/test_png_export.py
+      - name: فحص JavaScript لمحرر اللمس
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+
+          source = Path("canvas_editor_frontend/index.html").read_text(encoding="utf-8")
+          scripts = re.findall(r"<script>(.*?)</script>", source, flags=re.DOTALL)
+          assert len(scripts) == 1, f"Expected one editor script, found {len(scripts)}"
+          Path("/tmp/number-one-canvas-editor.js").write_text(scripts[0], encoding="utf-8")
+          PY
+          node --check /tmp/number-one-canvas-editor.js
       - name: اختبار حفظ المشاريع وعزل بيانات المستخدمين
         run: |
           python - <<'PY'
