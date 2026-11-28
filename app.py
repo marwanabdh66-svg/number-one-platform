@@ -1467,17 +1467,56 @@ elif page == "🤖 صانع الإعلان":
                 edited_template,
                 photo_bytes=editor_photo_bytes,
             )
+            canvas_template_id = str(edited_template.get("id", "selected"))
+            selected_layer_state_key = f"canvas_selected_layer_{canvas_template_id}"
+            selected_canvas_layer = st.session_state.get(selected_layer_state_key)
             drag_event = render_canvas_editor(
                 export_svg,
-                template_id=edited_template.get("id", ""),
-                key=f"number_one_canvas_{edited_template.get('id', 'selected')}",
+                template_id=canvas_template_id,
+                key=f"number_one_canvas_{canvas_template_id}",
+                selected_layer=selected_canvas_layer,
             )
             if isinstance(drag_event, dict):
-                drag_token = str(drag_event.get("token") or "")
-                if drag_token and drag_token != st.session_state.get("_last_canvas_drag_token"):
+                event_token = str(drag_event.get("token") or "")
+                event_action = str(drag_event.get("action") or "drag")
+                event_layer = drag_event.get("layer")
+                valid_canvas_layers = (
+                    set(DEFAULT_LAYER_POSITIONS)
+                    | set(DEFAULT_SHAPE_LAYERS)
+                    | {"image"}
+                )
+                if event_token and event_action == "select":
+                    if event_token != st.session_state.get("_last_canvas_selection_token"):
+                        st.session_state["_last_canvas_selection_token"] = event_token
+                        if event_layer is None or event_layer in valid_canvas_layers:
+                            st.session_state[selected_layer_state_key] = event_layer
+                            st.rerun()
+                elif event_token and event_token != st.session_state.get("_last_canvas_drag_token"):
+                    if event_layer in valid_canvas_layers:
+                        st.session_state[selected_layer_state_key] = event_layer
                     st.session_state["_pending_canvas_drag"] = dict(drag_event)
                     st.rerun()
-            st.caption("اسحب الصورة أو الشكل أو النص مباشرة داخل المعاينة لتغيير موضعه، بالماوس أو باللمس.")
+            canvas_layer_labels = {
+                "image": "الصورة",
+                "rectangle": "المستطيل",
+                "circle": "الدائرة",
+                "line": "الخط",
+                "headline": "العنوان الرئيسي",
+                "subtitle": "النص المساعد",
+                "price": "السعر أو العرض",
+                "call_to_action": "زر الدعوة للإجراء",
+                "symbol": "الرمز أو الأيقونة",
+            }
+            if selected_canvas_layer:
+                st.caption(
+                    f"العنصر المحدد بإطار أزرق: "
+                    f"{canvas_layer_labels.get(selected_canvas_layer, selected_canvas_layer)}. "
+                    "اضغط خارج العناصر أو زر Escape لإلغاء التحديد."
+                )
+            else:
+                st.caption(
+                    "المس عنصرًا لتحديده بإطار أزرق، ثم اسحبه لتغيير موضعه باللمس أو الماوس."
+                )
             st.download_button(
                 "تنزيل معاينة التصميم SVG",
                 data=export_svg,
