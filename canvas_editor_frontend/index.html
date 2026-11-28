@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin: 0; padding: 0; background: transparent; color: #eaf0fb;
+    font-family: Arial, sans-serif; overflow: hidden; }
+  #canvas { width: 100%; padding: 4px; box-sizing: border-box; }
+  #canvas svg { display: block; width: 100%; height: auto; max-width: 100%;
+    touch-action: none; user-select: none; -webkit-user-select: none; }
+  #canvas svg [data-layer] { cursor: grab; }
+  #canvas svg [data-layer]:active { cursor: grabbing; }
+  .hint { padding: 5px 8px 2px; color: #b9c6dc; font-size: 11px; line-height: 1.5; }
+  .error { color: #ffb4a8; font-size: 12px; padding: 12px; }
+</style>
+</head>
+<body>
+<div id="canvas"><div class="hint">المس عنصرًا داخل التصميم واسحبه لتغيير موضعه.</div></div>
+<script>
+(() => {
+  const host = document.getElementById("canvas");
+  let currentSvg = null;
+  let activeDrag = null;
+  let currentTemplateId = "";
+  let selectedLayerName = null;
+  let selectionOverlay = null;
+
+  function streamlitMessage(type, extra = {}) {
+    window.parent.postMessage({ isStreamlitMessage: true, type, ...extra }, "*");
+  }
+
+  function frameHeight() {
+    if (!currentSvg) return;
+    const height = Math.ceil(currentSvg.getBoundingClientRect().height + 34);
+    streamlitMessage("streamlit:setFrameHeight", { height: Math.max(250, height) });
+  }
+
+  function svgPoint(event) {
+    const point = currentSvg.createSVGPoint();
+    point.x = event.clientX;
+    point.y = event.clientY;
+    const matrix = currentSvg.getScreenCTM();
+    return matrix ? point.matrixTransform(matrix.inverse()) : null;
+  }
+
+  function setComponentValue(value) {
+    streamlitMessage("streamlit:setComponentValue", { value });
+  }
+
+  function createToken() {
+    return window.crypto && window.crypto.randomUUID
+      ? window.crypto.randomUUID()
+      : String(Date.now()) + "-" + String(Math.random()).slice(2);
+  }
+
+  function updateSelection() {
+    if (!currentSvg || !selectionOverlay || !selectedLayerName) {
+      if (selectionOverlay) selectionOverlay.setAttribute("visibility", "hidden");
+      return;
+    }
+
+    const group = Array.from(currentSvg.querySelectorAll("[data-layer]")).find(
+      item => item.getAttribute("data-layer") === selectedLayerName
+    );
+    if (!group || !group.firstElementChild) {
+      selectionOverlay.setAttribute("visibility", "hidden");
+      return;
+    }
+
+    try {
+      const box = group.getBBox();
+      const rootMatrix = currentSvg.getCTM();
+      const layerMatrix = group.getCTM();
+      if (!rootMatrix || !layerMatrix) {
+        selectionOverlay.setAttribute("visibility", "hidden");
+        return;
+      }
+
+      const relative = rootMatrix.inverse().multiply(layerMatrix);
+      const matrixValues = [
+        relative.a, relative.b, relative.c,
+        relative.d, relative.e, relative.f
+      ].map(value => Number(value.toFixed(4)));
+
+      selectionOverlay.setAttribute("x", box.x);
+      selectionOverlay.setAttribute("y", box.y);
+      selectionOverlay.setAttribute("width", Math.max(1, box.width));
+      selectionOverlay.setAttribute("height", Math.max(1, box.height));
+      selectionOverlay.setAttribute("transform", "matrix(" + matrixValues.join(" ") + ")");
+      selectionOverlay.setAttribute("visibility", "visible");
+    } catch (_) {
+      selectionOverlay.setAttribute("visibility", "hidden");
+    }
+  }
+
+  function render(args) {
+    const source = args && args.svg;
+    if (typeof source !== "string" || !source.trim()) {
+      host.innerHTML = '<div class="error">تعذر تحميل معاينة التصميم.</div>';
+      return;
+    }
+
+    const parsed = new DOMParser().parseFromString(source, "image/svg+xml");
+    const svg = parsed.documentElement;
+    if (
+      parsed.querySelector("parsererror") ||
+      !svg ||
+      svg.localName.toLowerCase() !== "svg" ||
+      svg.querySelector("script, foreignObject")
+    ) {
+      host.innerHTML = '<div class="error">ملف المعاينة غير صالح أو يحتوي عناصر غير مدعومة.</div>';
+      return;
+    }
+
+    const imported = document.importNode(svg, true);
+    imported.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    imported.style.width = "100%";
+    imported.style.height = "auto";
+    imported.style.touchAction = "none";
+    imported.setAttribute("aria-label", "مساحة تصميم NUMBER ONE القابلة للتحريك");
+    const nextTemplateId = String(args.template_id || "");
+    if (nextTemplateId !== currentTemplateId) selectedLayerName = null;
+    currentTemplateId = nextTemplateId;
+    if (Object.prototype.hasOwnProperty.call(args, "selected_layer")) {
+      selectedLayerName = typeof args.selected_layer === "string"
+        ? args.selected_layer
+        : null;
+    }
+    host.replaceChildren(imported);
+    currentSvg = imported;
+
+    const selection = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    selection.setAttribute("fill", "none");
+    selection.setAttribute("stroke", "#72B7FF");
+    selection.setAttribute("stroke-width", "3");
+    selection.setAttribute("stroke-dasharray", "9 6");
+    selection.setAttribute("rx", "8");
+    selection.setAttribute("pointer-events", "none");
+    selection.setAttribute("visibility", "hidden");
+    selection.setAttribute("data-editor-overlay", "selection");
+    selection.setAttribute("vector-effect", "non-scaling-stroke");
+    selectionOverlay = selection;
+    currentSvg.appendChild(selectionOverlay);
+    updateSelection();
+
+    currentSvg.addEventListener("pointerdown", event => {
+      if (event.pointerType === "mouse" && event.button !== 0) return;
+      const group = event.target.closest && event.target.closest("[data-layer]");
+      if (!group || !currentSvg.contains(group) || !group.firstElementChild) {
+        if (selectedLayerName) {
+          selectedLayerName = null;
+          updateSelection();
+          setComponentValue({
+            action: "select",
+            token: createToken(),
+            template_id: currentTemplateId,
+            layer: null
+          });
+        }
+        return;
+      }
+
+      const point = svgPoint(event);
+      if (!point) return;
+      event.preventDefault();
+      selectedLayerName = group.getAttribute("data-layer");
+      updateSelection();
+      activeDrag = {
+        group,
+        layer: selectedLayerName,
+        start: point,
+        dx: 0,
+        dy: 0,
+        moved: false
+      };
+      try { currentSvg.setPointerCapture(event.pointerId); } catch (_) {}
+    });
+
+    currentSvg.addEventListener("pointermove", event => {
+      if (!activeDrag) return;
+      const point = svgPoint(event);
+      if (!point) return;
+      activeDrag.dx = point.x - activeDrag.start.x;
+      activeDrag.dy = point.y - activeDrag.start.y;
+      activeDrag.moved = Math.hypot(activeDrag.dx, activeDrag.dy) >= 2;
+      activeDrag.group.setAttribute(
+        "transform",
+        "translate(" + activeDrag.dx.toFixed(2) + " " + activeDrag.dy.toFixed(2) + ")"
+      );
+      updateSelection();
+    });
+
+    currentSvg.addEventListener("pointerup", event => {
+      if (!activeDrag) return;
+      const drag = activeDrag;
+      activeDrag = null;
+      if (drag.moved) {
+        setComponentValue({
+          action: "drag",
+          token: createToken(),
+          template_id: currentTemplateId,
+          layer: drag.layer,
+          dx: Number(drag.dx.toFixed(2)),
+          dy: Number(drag.dy.toFixed(2))
+        });
+      } else {
+        drag.group.removeAttribute("transform");
+        selectedLayerName = drag.layer;
+        updateSelection();
+        setComponentValue({
+          action: "select",
+          token: createToken(),
+          template_id: currentTemplateId,
+          layer: drag.layer
+        });
+      }
+      try { currentSvg.releasePointerCapture(event.pointerId); } catch (_) {}
+    });
+
+    currentSvg.addEventListener("pointercancel", () => {
+      if (!activeDrag) return;
+      activeDrag.group.removeAttribute("transform");
+      activeDrag = null;
+      updateSelection();
+    });
+
+    frameHeight();
+    if (window.ResizeObserver) {
+      const observer = new ResizeObserver(frameHeight);
+      observer.observe(currentSvg);
+    }
+  }
+
+  window.addEventListener("keydown", event => {
+    if (event.key !== "Escape" || !selectedLayerName) return;
+    selectedLayerName = null;
+    updateSelection();
+    setComponentValue({
+      action: "select",
+      token: createToken(),
+      template_id: currentTemplateId,
+      layer: null
+    });
+  });
+
+  window.addEventListener("message", event => {
+    const data = event.data || {};
+    if (data.type === "streamlit:render") render(data.args || {});
+  });
+
+  streamlitMessage("streamlit:componentReady", { apiVersion: 1 });
+})();
+</script>
+</body>
+</html>
